@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@400;500;600&display=swap');
+
+:root {
+  --ink: #f4f7eb;
+  --ink-dim: #8bc4cd;
+  --line-soft: rgb(94 181 192 / 0.45);
+  --line-strong: rgb(130 206 216 / 0.6);
+  --outer-shadow:
+    0 22px 42px rgb(0 0 0 / 0.45),
+    0 4px 0 rgb(123 197 208 / 0.22);
+
+  font-family: 'Chakra Petch', sans-serif;
+  color: var(--ink);
+  line-height: 1.4;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 18% 16%, rgb(15 70 77 / 0.45), transparent 30%),
+    radial-gradient(circle at 85% 10%, rgb(180 97 31 / 0.32), transparent 34%),
+    linear-gradient(180deg, #072335 0%, #051521 100%);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgb(255 255 255 / 0.02),
+      rgb(255 255 255 / 0.02) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  mix-blend-mode: soft-light;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+button {
+  font-family: 'Black Ops One', cursive;
+  font-weight: 400;
+}
+
+p,
+li,
+td,
+th,
+input {
+  font-family: 'Chakra Petch', sans-serif;
+}
