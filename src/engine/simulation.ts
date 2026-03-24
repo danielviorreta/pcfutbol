@@ -1,4 +1,4 @@
-import type { Fixture, LeagueState, MatchResult, Team } from '../types/game'
+import type { Fixture, LeagueState, MatchResult, Player, Team } from '../types/game'
 import { getDefaultLineup, getTeamRatings, isPlayerAvailable, normalizeLineup } from './squad'
 
 interface PlayRoundOptions {
@@ -69,12 +69,51 @@ function getInjuryDuration(fatigue: number): number {
   return 1 + Math.floor(Math.random() * 3)
 }
 
-function sampleGoals(offenseScore: number, defenseScore: number): number {
+function sampleHalfGoals(offenseScore: number, defenseScore: number, tempo = 1): number {
   const edge = offenseScore - defenseScore
-  const base = 1.15 + edge / 52
-  const withVariance = base + (Math.random() * 1.8 - 0.9)
+  const base = 0.55 + edge / 72
+  const withVariance = base * tempo + (Math.random() * 1.1 - 0.55)
 
-  return clamp(Math.round(withVariance), 0, 6)
+  return clamp(Math.round(withVariance), 0, 4)
+}
+
+function getLineupPlayers(team: Team, lineup: string[]): Player[] {
+  return lineup
+    .map((id) => team.players.find((player) => player.id === id))
+    .filter((player): player is Player => Boolean(player))
+}
+
+function estimateSubstitutionImpact(team: Team, lineup: string[]): { attack: number; defense: number } {
+  const lineupIds = new Set(lineup)
+  const starters = getLineupPlayers(team, lineup)
+  const bench = team.players
+    .filter((player) => !lineupIds.has(player.id) && isPlayerAvailable(player))
+    .sort((a, b) => b.overall - a.overall)
+
+  if (starters.length === 0 || bench.length === 0) {
+    return { attack: 0, defense: 0 }
+  }
+
+  const outgoing = [...starters]
+    .sort((a, b) => (b.fatigue + (100 - b.stamina) * 0.35) - (a.fatigue + (100 - a.stamina) * 0.35))
+    .slice(0, 2)
+  const incoming = bench.slice(0, 2)
+
+  if (outgoing.length === 0 || incoming.length === 0) {
+    return { attack: 0, defense: 0 }
+  }
+
+  const outgoingAvg = outgoing.reduce((sum, player) => sum + player.overall, 0) / outgoing.length
+  const incomingAvg = incoming.reduce((sum, player) => sum + player.overall, 0) / incoming.length
+  const delta = incomingAvg - outgoingAvg
+
+  const attackingIncoming = incoming.filter((player) => player.position === 'FWD' || player.position === 'MID').length
+  const defensiveIncoming = incoming.filter((player) => player.position === 'DEF' || player.position === 'GK').length
+
+  return {
+    attack: clamp(delta / 70 + attackingIncoming * 0.03, -0.12, 0.2),
+    defense: clamp(delta / 90 + defensiveIncoming * 0.025, -0.1, 0.16),
+  }
 }
 
 function getLineupForTeam(team: Team, options: PlayRoundOptions): string[] {
@@ -109,8 +148,32 @@ function getMatchPack(
   const homeDefense = awayRatings.defense + awayRatings.midfield * 0.18
   const awayDefense = homeRatings.defense + homeRatings.midfield * 0.18
 
-  const homeGoals = sampleGoals(homeAttack, homeDefense)
-  const awayGoals = sampleGoals(awayAttack, awayDefense)
+  const homeFirstHalfGoals = sampleHalfGoals(homeAttack * 0.98, homeDefense, 1)
+  const awayFirstHalfGoals = sampleHalfGoals(awayAttack * 0.95, awayDefense, 0.98)
+
+  const homeSubImpact = estimateSubstitutionImpact(homeTeam, homeLineup)
+  const awaySubImpact = estimateSubstitutionImpact(awayTeam, awayLineup)
+
+  const homeTrailing = homeFirstHalfGoals < awayFirstHalfGoals
+  const awayTrailing = awayFirstHalfGoals < homeFirstHalfGoals
+  const homeLeading = homeFirstHalfGoals > awayFirstHalfGoals
+  const awayLeading = awayFirstHalfGoals > homeFirstHalfGoals
+
+  const homeAttackTactical = homeTrailing ? 1.12 : homeLeading ? 0.94 : 1.03
+  const awayAttackTactical = awayTrailing ? 1.12 : awayLeading ? 0.94 : 1.03
+  const homeDefenseTactical = homeTrailing ? 0.95 : homeLeading ? 1.07 : 1
+  const awayDefenseTactical = awayTrailing ? 0.95 : awayLeading ? 1.07 : 1
+
+  const homeSecondHalfAttack = homeAttack * homeAttackTactical * (1 + homeSubImpact.attack)
+  const awaySecondHalfDefense = homeDefense * awayDefenseTactical * (1 + awaySubImpact.defense)
+  const awaySecondHalfAttack = awayAttack * awayAttackTactical * (1 + awaySubImpact.attack)
+  const homeSecondHalfDefense = awayDefense * homeDefenseTactical * (1 + homeSubImpact.defense)
+
+  const homeSecondHalfGoals = sampleHalfGoals(homeSecondHalfAttack, awaySecondHalfDefense, 1.04)
+  const awaySecondHalfGoals = sampleHalfGoals(awaySecondHalfAttack, homeSecondHalfDefense, 1.04)
+
+  const homeGoals = clamp(homeFirstHalfGoals + homeSecondHalfGoals, 0, 6)
+  const awayGoals = clamp(awayFirstHalfGoals + awaySecondHalfGoals, 0, 6)
 
   return {
     fixture,
