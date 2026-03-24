@@ -86,6 +86,45 @@ function getMatchPack(
   }
 }
 
+function applyMatchDayRevenue(teams: Team[], results: MatchResult[]): Team[] {
+  const teamsById = new Map(teams.map((t) => [t.id, t]))
+  const revenueByTeamId = new Map<string, number>()
+
+  for (const result of results) {
+    const homeTeam = teamsById.get(result.homeTeamId)
+    const awayTeam = teamsById.get(result.awayTeamId)
+
+    if (!homeTeam) {
+      continue
+    }
+
+    const { stadium } = homeTeam
+
+    // Price elasticity: -0.5% per € above optimal €35
+    const priceEffect = Math.max(0, (stadium.ticketPrice - 35) * 0.005)
+    // Morale: ±0.2% per point from 70
+    const moraleEffect = (homeTeam.morale - 70) * 0.002
+    // Game importance: stronger opponent draws bigger crowd
+    const opponentStrength = awayTeam
+      ? (awayTeam.attack + awayTeam.midfield + awayTeam.defense) / 3
+      : 75
+    const importanceEffect = (opponentStrength - 75) * 0.004
+    // Random match-day variance ±3%
+    const variance = (Math.random() - 0.5) * 0.06
+
+    const fillRate = clamp(0.70 - priceEffect + moraleEffect + importanceEffect + variance, 0.20, 0.98)
+    const revenue = Math.round(stadium.capacity * fillRate * stadium.ticketPrice)
+
+    revenueByTeamId.set(result.homeTeamId, revenue)
+  }
+
+  return teams.map((team) => {
+    const revenue = revenueByTeamId.get(team.id)
+
+    return revenue !== undefined ? { ...team, budget: team.budget + revenue } : team
+  })
+}
+
 function updateTeamTable(teams: Team[], results: MatchResult[]): Team[] {
   const nextTeams = teams.map((team) => ({ ...team }))
   const teamsById = new Map(nextTeams.map((team) => [team.id, team]))
@@ -254,7 +293,8 @@ export function playCurrentRound(state: LeagueState, options: PlayRoundOptions):
   const results = packs.map((pack) => pack.result)
 
   const updatedTableTeams = updateTeamTable(recoveredTeams, results)
-  const updatedTeams = applyLineupEffects(updatedTableTeams, packs)
+  const revenueTeams = applyMatchDayRevenue(updatedTableTeams, results)
+  const updatedTeams = applyLineupEffects(revenueTeams, packs)
 
   const updatedFixtures = state.fixtures.map((fixture) => {
     const result = results.find((item) => item.fixtureId === fixture.id)

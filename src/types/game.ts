@@ -44,6 +44,13 @@ export interface YouthPlayer {
   progress: number
 }
 
+export interface Stadium {
+  name: string
+  capacity: number
+  ticketPrice: number
+  upgradeWeeksRemaining?: number
+}
+
 export interface SponsorDeal {
   name: string
   weeklyIncome: number
@@ -57,6 +64,7 @@ export interface Team {
   name: string
   crestUrl?: string
   tactic: Tactic
+  stadium: Stadium
   budget: number
   morale: number
   attack: number

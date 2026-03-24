@@ -95,6 +95,7 @@ function buildStandingsIndex(teams: Team[]): Map<string, number> {
 
 export function applyWeeklyClubManagement(
   state: LeagueState,
+  _managerTeamId?: string,
 ): { nextState: LeagueState; headlines: string[] } {
   const standings = buildStandingsIndex(state.teams)
   const isSeasonOver = state.currentRound > state.totalRounds
@@ -116,10 +117,27 @@ export function applyWeeklyClubManagement(
 
     const trained = applyTrainingToTeam(team)
 
+    let { stadium } = trained
+    const weeksLeft = stadium.upgradeWeeksRemaining ?? 0
+
+    if (weeksLeft > 0) {
+      const remaining = weeksLeft - 1
+      const newCapacity = remaining === 0
+        ? Math.min(MAX_CAPACITY, stadium.capacity + UPGRADE_SEATS)
+        : stadium.capacity
+
+      stadium = { ...stadium, capacity: newCapacity, upgradeWeeksRemaining: remaining }
+
+      if (remaining === 0) {
+        headlines.push(`Obras terminadas en ${stadium.name}. Nuevo aforo: ${newCapacity.toLocaleString('es-ES')} plazas.`)
+      }
+    }
+
     return {
       ...trained,
       budget,
       sponsor,
+      stadium,
     }
   })
 
@@ -155,6 +173,73 @@ export function setTeamTactic(
     teams: state.teams.map((team) =>
       team.id === managerTeamId ? { ...team, tactic } : team,
     ),
+  }
+}
+
+export function setStadiumTicketPrice(
+  state: LeagueState,
+  managerTeamId: string,
+  price: number,
+): LeagueState {
+  const clamped = clamp(Math.round(price), 10, 200)
+
+  return {
+    ...state,
+    teams: state.teams.map((team) =>
+      team.id === managerTeamId
+        ? { ...team, stadium: { ...team.stadium, ticketPrice: clamped } }
+        : team,
+    ),
+  }
+}
+
+const UPGRADE_SEATS = 5_000
+const MAX_CAPACITY = 120_000
+const UPGRADE_WEEKS = 4
+
+export function upgradeStadium(
+  state: LeagueState,
+  managerTeamId: string,
+): { nextState: LeagueState; message: string; ok: boolean } {
+  const team = state.teams.find((t) => t.id === managerTeamId)
+
+  if (!team) {
+    return { nextState: state, message: 'Equipo no encontrado.', ok: false }
+  }
+
+  if (team.stadium.capacity >= MAX_CAPACITY) {
+    return { nextState: state, message: 'El estadio ha alcanzado la capacidad maxima (120.000 plazas).', ok: false }
+  }
+
+  if ((team.stadium.upgradeWeeksRemaining ?? 0) > 0) {
+    return { nextState: state, message: 'Ya hay obras en curso en el estadio.', ok: false }
+  }
+
+  const upgradeCost = Math.max(5_000_000, Math.round(team.stadium.capacity * 100))
+
+  if (team.budget < upgradeCost) {
+    return {
+      nextState: state,
+      message: `No hay presupuesto para ampliar el estadio. Coste: ${upgradeCost.toLocaleString('es-ES')} €`,
+      ok: false,
+    }
+  }
+
+  return {
+    nextState: {
+      ...state,
+      teams: state.teams.map((t) =>
+        t.id !== managerTeamId
+          ? t
+          : {
+              ...t,
+              budget: t.budget - upgradeCost,
+              stadium: { ...t.stadium, upgradeWeeksRemaining: UPGRADE_WEEKS },
+            },
+      ),
+    },
+    message: `Obras iniciadas en ${team.stadium.name}. Finalizarán en ${UPGRADE_WEEKS} semanas.`,
+    ok: true,
   }
 }
 

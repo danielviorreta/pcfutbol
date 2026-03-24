@@ -5,8 +5,10 @@ import {
   applyWeeklyClubManagement,
   promoteYouthPlayer,
   renewPlayerContract,
+  setStadiumTicketPrice,
   setTeamTactic,
   setTeamTrainingFocus,
+  upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
 import { loadSaveStorage, saveSaveStorage, toGameSummaries } from '../engine/persistence'
 import { playCurrentRound, sortLeagueTable } from '../engine/simulation'
@@ -56,6 +58,8 @@ interface GameContextValue {
   setTactic: (tactic: Tactic) => void
   renewContract: (playerId: string) => void
   promoteYouth: (youthId: string) => void
+  setTicketPrice: (price: number) => void
+  upgradeStadium: () => void
   clearNotice: () => void
 }
 
@@ -167,7 +171,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         managerLineup: prev.managerLineup,
       })
 
-      const { nextState, headlines } = applyWeeklyClubManagement(simulatedState)
+      const { nextState, headlines } = applyWeeklyClubManagement(simulatedState, prev.managerTeamId)
       const withWeeklyNews = {
         ...nextState,
         news: [...headlines, ...nextState.news].slice(0, 12),
@@ -360,6 +364,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  const setTicketPrice = (price: number) => {
+    updateActiveGame((prev) => ({
+      ...prev,
+      leagueState: setStadiumTicketPrice(prev.leagueState, prev.managerTeamId, price),
+    }))
+  }
+
+  const upgradeStadium = () => {
+    updateActiveGame((prev) => {
+      const { nextState, message, ok } = upgradeStadiumEngine(prev.leagueState, prev.managerTeamId)
+      setNotice(message)
+
+      if (!ok) {
+        return prev
+      }
+
+      return { ...prev, leagueState: nextState }
+    })
+  }
+
   const clearNotice = () => setNotice(null)
 
   const value: GameContextValue = {
@@ -385,6 +409,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setTactic,
     renewContract,
     promoteYouth,
+    setTicketPrice,
+    upgradeStadium,
     clearNotice,
   }
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useGame } from '../state/gameState'
 import type { TrainingFocus } from '../types/game'
 
@@ -17,7 +18,8 @@ const focusOptions: { value: TrainingFocus; label: string }[] = [
 ]
 
 export function ClubPage() {
-  const { managerTeam, setTrainingFocus, renewContract, promoteYouth } = useGame()
+  const { managerTeam, setTrainingFocus, renewContract, promoteYouth, setTicketPrice, upgradeStadium } = useGame()
+  const [priceInput, setPriceInput] = useState<string>('')
 
   if (!managerTeam) {
     return null
@@ -26,6 +28,13 @@ export function ClubPage() {
   const payroll = Math.round(
     managerTeam.players.reduce((sum, player) => sum + player.wage, 0) / 52,
   )
+
+  const { stadium } = managerTeam
+  const fillRate = Math.min(0.95, Math.max(0.55, 0.55 + managerTeam.morale / 200))
+  const estimatedRevenue = Math.round(stadium.capacity * fillRate * stadium.ticketPrice)
+  const upgradeCost = Math.max(5_000_000, Math.round(stadium.capacity * 100))
+  const upgradeInProgress = (stadium.upgradeWeeksRemaining ?? 0) > 0
+  const atMaxCapacity = stadium.capacity >= 120_000
 
   return (
     <section className="page-grid">
@@ -38,6 +47,56 @@ export function ClubPage() {
         <p>
           Objetivo sponsor: Top {managerTeam.sponsor.targetRank} (bonus {formatCurrency(managerTeam.sponsor.seasonBonus)})
         </p>
+      </article>
+
+      <article className="panel">
+        <h2>Estadio</h2>
+        <p>Nombre: <strong>{stadium.name}</strong></p>
+        <p>Aforo: <strong>{stadium.capacity.toLocaleString('es-ES')} plazas</strong></p>
+        <p>Entrada actual: <strong>{formatCurrency(stadium.ticketPrice)}</strong></p>
+        <p>Ingresos estimados por partido: <strong>{formatCurrency(estimatedRevenue)}</strong></p>
+        <div className="actions" style={{ alignItems: 'center' }}>
+          <input
+            type="number"
+            min={10}
+            max={200}
+            step={1}
+            placeholder={String(stadium.ticketPrice)}
+            value={priceInput}
+            onChange={(e) => setPriceInput(e.target.value)}
+            style={{ width: '80px' }}
+          />
+          <button
+            className="secondary"
+            disabled={priceInput === '' || Number(priceInput) < 10 || Number(priceInput) > 200}
+            onClick={() => {
+              setTicketPrice(Number(priceInput))
+              setPriceInput('')
+            }}
+          >
+            Fijar precio
+          </button>
+        </div>
+        <p style={{ marginTop: '0.75rem' }}>
+          Ampliar estadio (+5.000 plazas, 4 semanas de obras): <strong>{formatCurrency(upgradeCost)}</strong>
+        </p>
+        {upgradeInProgress ? (
+          <p style={{ color: 'var(--accent)' }}>
+            ⚙ Obras en curso — <strong>{stadium.upgradeWeeksRemaining} semana{stadium.upgradeWeeksRemaining === 1 ? '' : 's'} restante{stadium.upgradeWeeksRemaining === 1 ? '' : 's'}</strong>
+          </p>
+        ) : atMaxCapacity ? (
+          <p>Aforo maximo alcanzado (120.000 plazas).</p>
+        ) : (
+          <div className="actions">
+            <button
+              className="secondary"
+              disabled={managerTeam.budget < upgradeCost}
+              onClick={upgradeStadium}
+            >
+              Iniciar obras
+            </button>
+          </div>
+        )}
       </article>
 
       <article className="panel">
