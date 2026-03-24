@@ -338,7 +338,6 @@ function applyPromotionRelegation(teams: Team[]): { teams: Team[]; headlines: st
 
 export function applyWeeklyClubManagement(
   state: LeagueState,
-  _managerTeamId?: string,
 ): { nextState: LeagueState; headlines: string[] } {
   const standings = buildStandingsIndex(state.teams)
   const isSeasonOver = state.currentRound > state.totalRounds

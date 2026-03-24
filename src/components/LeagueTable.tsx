@@ -9,7 +9,12 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
-export function LeagueTable({ teams }: { teams: Team[] }) {
+interface LeagueTableProps {
+  teams: Team[]
+  managerTeamId?: string
+}
+
+export function LeagueTable({ teams, managerTeamId }: LeagueTableProps) {
   return (
     <table>
       <thead>
@@ -25,8 +30,9 @@ export function LeagueTable({ teams }: { teams: Team[] }) {
       <tbody>
         {teams.map((team, index) => {
           const goalDiff = team.goalsFor - team.goalsAgainst
+          const isManagerTeam = team.id === managerTeamId
           return (
-            <tr key={team.id}>
+            <tr key={team.id} className={isManagerTeam ? 'table-row-manager' : undefined}>
               <td>{index + 1}</td>
               <td>
                 <div className="team-with-crest">
