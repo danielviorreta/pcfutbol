@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardPage } from './pages/DashboardPage'
 import { ClubPage } from './pages/ClubPage'
 import { GamesPage } from './pages/GamesPage'
+import { MatchDayPage } from './pages/MatchDayPage'
 import { PromotionPage } from './pages/PromotionPage'
 import { SquadPage } from './pages/SquadPage'
 import { TransfersPage } from './pages/TransfersPage'
@@ -78,6 +79,7 @@ function App() {
         <Route path="/" element={<Navigate to={game ? '/dashboard' : '/games'} replace />} />
         <Route path="/games" element={<GamesPage />} />
         <Route path="/dashboard" element={game ? <DashboardPage /> : <Navigate to="/games" replace />} />
+        <Route path="/matchday" element={game ? <MatchDayPage /> : <Navigate to="/games" replace />} />
         <Route path="/squad" element={game ? <SquadPage /> : <Navigate to="/games" replace />} />
         <Route path="/club" element={game ? <ClubPage /> : <Navigate to="/games" replace />} />
         <Route path="/promotions" element={game ? <PromotionPage /> : <Navigate to="/games" replace />} />

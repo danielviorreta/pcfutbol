@@ -113,6 +113,74 @@ export interface MatchResult {
   awayGoals: number
 }
 
+export interface MatchPresentation {
+  phase: 'preview' | 'result'
+  round: number
+  fixtureId: string
+  homeTeamId: string
+  awayTeamId: string
+  homeLineup: string[]
+  awayLineup: string[]
+  result?: MatchResult
+  stats?: MatchStats
+  commentary?: MatchCommentaryEvent[]
+  goals?: MatchGoalRecord[]
+  incidents?: MatchIncidentRecord[]
+  substitutions?: MatchSubstitutionRecord[]
+  tacticalChanges?: MatchTacticalChangeRecord[]
+}
+
+export interface MatchStatsSide {
+  possession: number
+  shots: number
+  shotsOnTarget: number
+  bigChances: number
+}
+
+export interface MatchStats {
+  home: MatchStatsSide
+  away: MatchStatsSide
+  attendance: number
+}
+
+export interface MatchCommentaryEvent {
+  minute: number
+  text: string
+  kind?: 'general' | 'goal' | 'incident' | 'substitution' | 'tactical' | 'final'
+  teamId?: string
+  scoreHome?: number
+  scoreAway?: number
+}
+
+export interface MatchGoalRecord {
+  minute: number
+  teamId: string
+  scorer: string
+  assist?: string
+}
+
+export interface MatchIncidentRecord {
+  minute: number
+  teamId: string
+  player: string
+  type: 'yellow' | 'red' | 'injury'
+  detail?: string
+}
+
+export interface MatchSubstitutionRecord {
+  minute: number
+  teamId: string
+  playerOut: string
+  playerIn: string
+  reason: 'tactical' | 'injury' | 'fatigue'
+}
+
+export interface MatchTacticalChangeRecord {
+  minute: number
+  teamId: string
+  summary: string
+}
+
 export interface PlayoffLeg {
   homeTeam: string
   awayTeam: string

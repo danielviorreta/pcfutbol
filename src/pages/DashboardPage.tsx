@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { LeagueTable } from '../components/LeagueTable'
 import { NewsList } from '../components/NewsList'
 import { ResultsList } from '../components/ResultsList'
@@ -28,10 +29,11 @@ export function DashboardPage() {
     game,
     managerTeam,
     table,
-    playRound,
+    prepareMatchPresentation,
     resetGame,
     saveCurrentGame,
   } = useGame()
+  const navigate = useNavigate()
 
   const divisionTables: Record<DashboardCompetition, typeof table> = useMemo(() => {
     if (!game) {
@@ -103,7 +105,14 @@ export function DashboardPage() {
         </p>
 
         <div className="actions">
-          <button onClick={playRound} disabled={isSeasonOver}>
+          <button
+            onClick={() => {
+              if (prepareMatchPresentation()) {
+                navigate('/matchday')
+              }
+            }}
+            disabled={isSeasonOver}
+          >
             Jugar Jornada
           </button>
           <button className="secondary" onClick={saveCurrentGame}>
