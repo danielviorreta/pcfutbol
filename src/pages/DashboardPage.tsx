@@ -156,7 +156,7 @@ export function DashboardPage() {
             1a RFEF G2
           </button>
         </div>
-        <LeagueTable teams={divisionTables[selectedDivision]} />
+        <LeagueTable teams={divisionTables[selectedDivision]} managerTeamId={managerTeam.id} />
       </article>
 
       <article className="panel">
