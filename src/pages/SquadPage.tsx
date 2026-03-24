@@ -3,6 +3,12 @@ import { getLineupAssignments, getLineupPlayers, isPlayerAvailable } from '../en
 import { useGame } from '../state/gameState'
 import type { Tactic } from '../types/game'
 
+const tacticOptions: { value: Tactic; label: string }[] = [
+  { value: '4-3-3', label: '4-3-3' },
+  { value: '4-4-2', label: '4-4-2' },
+  { value: '5-4-1', label: '5-4-1' },
+]
+
 const tacticSlotCoords: Record<Tactic, { x: number; y: number }[]> = {
   '4-3-3': [
     { x: 50, y: 92 },
@@ -63,7 +69,7 @@ function formatCurrency(value: number): string {
 }
 
 export function SquadPage() {
-  const { game, managerTeam, setLineupSlotPlayer, autoPickLineup } = useGame()
+  const { game, managerTeam, setLineupSlotPlayer, autoPickLineup, setTactic } = useGame()
 
   if (!game || !managerTeam) {
     return null
@@ -109,13 +115,29 @@ export function SquadPage() {
         <p>
           Jugadores seleccionados: <strong>{lineupPlayers.length}</strong> / 11
         </p>
-        <p>Tactica: {tactic}</p>
         <p>Media del once: {averageOverall}</p>
         <p>Bajas actuales: {unavailableCount}</p>
         <div className="actions">
           <button className="secondary" onClick={autoPickLineup}>
             Auto Alinear
           </button>
+        </div>
+      </article>
+
+      <article className="panel">
+        <h2>Tactica</h2>
+        <p>Sistema actual: <strong>{managerTeam.tactic ?? '4-3-3'}</strong></p>
+        <div className="actions">
+          {tacticOptions.map((option) => (
+            <button
+              key={option.value}
+              className="secondary"
+              onClick={() => setTactic(option.value)}
+              disabled={(managerTeam.tactic ?? '4-3-3') === option.value}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </article>
 
