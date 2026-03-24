@@ -21,6 +21,7 @@ type TeamSeed = Omit<
   | 'players'
   | 'youthPlayers'
   | 'sponsor'
+  | 'staff'
   | 'tactic'
   | 'trainingFocus'
 >
@@ -847,6 +848,7 @@ function buildPlayer(team: TeamSeed, teamIndex: number, playerIndex: number): Pl
     fatigue: 18 + (seed % 20),
     injuryWeeks: 0,
     suspensionWeeks: 0,
+    yellowCards: 0,
     contractYears: 1 + (seed % 5),
   }
 }
@@ -886,6 +888,10 @@ function toTeam(base: TeamSeed, teamIndex: number): Team {
       targetRank: Math.min(6, 2 + Math.floor(teamIndex / 2)),
       seasonBonus: 2_800_000 - teamIndex * 180_000,
       seasonBonusPaid: false,
+    },
+    staff: {
+      medicalLevel: 1,
+      disciplineLevel: 1,
     },
     tactic: tacticCycle[teamIndex % tacticCycle.length],
     trainingFocus: trainingFocusCycle[teamIndex % trainingFocusCycle.length],

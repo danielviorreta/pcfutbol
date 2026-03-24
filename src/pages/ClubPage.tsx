@@ -18,7 +18,16 @@ const focusOptions: { value: TrainingFocus; label: string }[] = [
 ]
 
 export function ClubPage() {
-  const { managerTeam, setTrainingFocus, renewContract, promoteYouth, setTicketPrice, upgradeStadium } = useGame()
+  const {
+    managerTeam,
+    setTrainingFocus,
+    renewContract,
+    promoteYouth,
+    setTicketPrice,
+    upgradeStadium,
+    improveMedicalStaff,
+    improveDisciplineStaff,
+  } = useGame()
   const [priceInput, setPriceInput] = useState<string>('')
 
   if (!managerTeam) {
@@ -33,6 +42,8 @@ export function ClubPage() {
   const fillRate = Math.min(0.95, Math.max(0.55, 0.55 + managerTeam.morale / 200))
   const estimatedRevenue = Math.round(stadium.capacity * fillRate * stadium.ticketPrice)
   const upgradeCost = Math.max(5_000_000, Math.round(stadium.capacity * 100))
+  const medicalUpgradeCost = 800_000 + managerTeam.staff.medicalLevel * 600_000
+  const disciplineUpgradeCost = 800_000 + managerTeam.staff.disciplineLevel * 600_000
   const upgradeInProgress = (stadium.upgradeWeeksRemaining ?? 0) > 0
   const atMaxCapacity = stadium.capacity >= 120_000
 
@@ -113,6 +124,28 @@ export function ClubPage() {
               {option.label}
             </button>
           ))}
+        </div>
+      </article>
+
+      <article className="panel">
+        <h2>Cuerpo Tecnico</h2>
+        <p>Medicos: <strong>Nivel {managerTeam.staff.medicalLevel}</strong></p>
+        <p>Disciplina: <strong>Nivel {managerTeam.staff.disciplineLevel}</strong></p>
+        <div className="actions">
+          <button
+            className="secondary"
+            onClick={improveMedicalStaff}
+            disabled={managerTeam.staff.medicalLevel >= 5 || managerTeam.budget < medicalUpgradeCost}
+          >
+            Mejorar medicos ({formatCurrency(medicalUpgradeCost)})
+          </button>
+          <button
+            className="secondary"
+            onClick={improveDisciplineStaff}
+            disabled={managerTeam.staff.disciplineLevel >= 5 || managerTeam.budget < disciplineUpgradeCost}
+          >
+            Mejorar disciplina ({formatCurrency(disciplineUpgradeCost)})
+          </button>
         </div>
       </article>
 

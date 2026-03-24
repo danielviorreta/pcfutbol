@@ -52,6 +52,23 @@ function persistStorage(storage: SaveStorage): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(storage))
 }
 
+function normalizeGame(game: ManagerGameState): ManagerGameState {
+  return {
+    ...game,
+    leagueState: {
+      ...game.leagueState,
+      teams: game.leagueState.teams.map((team) => ({
+        ...team,
+        staff: team.staff ?? { medicalLevel: 1, disciplineLevel: 1 },
+        players: team.players.map((player) => ({
+          ...player,
+          yellowCards: player.yellowCards ?? 0,
+        })),
+      })),
+    },
+  }
+}
+
 export function loadSaveStorage(): SaveStorage {
   const raw = localStorage.getItem(STORAGE_KEY)
 
@@ -59,7 +76,9 @@ export function loadSaveStorage(): SaveStorage {
     try {
       const parsed = JSON.parse(raw) as Partial<SaveStorage>
       const games = Array.isArray(parsed.games)
-        ? parsed.games.filter((game): game is ManagerGameState => isValidGame(game))
+        ? parsed.games
+          .filter((game): game is ManagerGameState => isValidGame(game))
+          .map(normalizeGame)
         : []
       const activeGameId =
         typeof parsed.activeGameId === 'string' && games.some((game) => game.id === parsed.activeGameId)
@@ -85,9 +104,11 @@ export function loadSaveStorage(): SaveStorage {
       return { games: [], activeGameId: null }
     }
 
+    const normalized = normalizeGame(migrated)
+
     const storage = {
-      games: [migrated],
-      activeGameId: migrated.id,
+      games: [normalized],
+      activeGameId: normalized.id,
     }
 
     persistStorage(storage)

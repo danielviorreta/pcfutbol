@@ -13,6 +13,13 @@ interface MatchPack {
   awayLineup: string[]
 }
 
+interface RoundIncidents {
+  injuries: string[]
+  bookings: string[]
+  reds: string[]
+  suspensions: string[]
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
@@ -27,6 +34,39 @@ function recoverAvailability(team: Team): Team {
       fatigue: clamp(player.fatigue - 5, 0, 100),
     })),
   }
+}
+
+function getYellowCardChance(team: Team, playerId: string, fatigue: number): number {
+  const player = team.players.find((item) => item.id === playerId)
+  if (!player) {
+    return 0.09
+  }
+
+  const baseByPosition =
+    player.position === 'DEF'
+      ? 0.14
+      : player.position === 'MID'
+        ? 0.1
+        : player.position === 'FWD'
+          ? 0.07
+          : 0.03
+
+  const disciplineMod = 1 - (team.staff.disciplineLevel - 1) * 0.1
+
+  return clamp((baseByPosition + fatigue / 700) * disciplineMod, 0.02, 0.3)
+}
+
+function getInjuryChance(team: Team, stamina: number, fatigue: number): number {
+  const medicalMod = 1 - (team.staff.medicalLevel - 1) * 0.12
+  return clamp((0.006 + fatigue / 1500 + (100 - stamina) / 4000) * medicalMod, 0.003, 0.16)
+}
+
+function getInjuryDuration(fatigue: number): number {
+  if (fatigue >= 88) {
+    return 2 + Math.floor(Math.random() * 4)
+  }
+
+  return 1 + Math.floor(Math.random() * 3)
 }
 
 function sampleGoals(offenseScore: number, defenseScore: number): number {
@@ -169,9 +209,15 @@ function updateTeamTable(teams: Team[], results: MatchResult[]): Team[] {
   return nextTeams
 }
 
-function applyLineupEffects(teams: Team[], packs: MatchPack[]): Team[] {
+function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[]; incidents: RoundIncidents } {
   const lineupsByTeam = new Map<string, string[]>()
   const outcomesByTeam = new Map<string, 'win' | 'draw' | 'loss'>()
+  const incidents: RoundIncidents = {
+    injuries: [],
+    bookings: [],
+    reds: [],
+    suspensions: [],
+  }
 
   for (const pack of packs) {
     lineupsByTeam.set(pack.fixture.homeTeamId, pack.homeLineup)
@@ -189,7 +235,7 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): Team[] {
     }
   }
 
-  return teams.map((team) => {
+  const nextTeams = teams.map((team) => {
     const lineup = lineupsByTeam.get(team.id)
     const outcome = outcomesByTeam.get(team.id)
 
@@ -212,27 +258,60 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): Team[] {
         if (!lineupSet.has(player.id)) {
           return {
             ...player,
-            fatigue: clamp(player.fatigue - 8, 0, 100),
+            fatigue: clamp(player.fatigue - 9, 0, 100),
             form: clamp(player.form + 1, 40, 99),
           }
         }
 
-        const fatigueInc = 9 + Math.floor(Math.random() * 7) - Math.floor(player.stamina / 22)
+        const fatigueInc =
+          7
+          + Math.floor(Math.random() * 5)
+          + Math.max(0, Math.floor((100 - player.stamina) / 18))
+          + Math.max(0, Math.floor((player.fatigue - 60) / 12))
         const fatigue = clamp(player.fatigue + fatigueInc, 0, 100)
 
         const formDelta = outcome === 'win' ? 2 : outcome === 'loss' ? -2 : 0
         const form = clamp(player.form + formDelta, 35, 99)
 
-        const injuryChance = 0.012 + fatigue / 2400
-        const suspensionChance = 0.03
+        const injuryChance = getInjuryChance(team, player.stamina, fatigue)
+        const yellowChance = getYellowCardChance(team, player.id, fatigue)
+        const redChance = clamp((0.004 + fatigue / 5000) * (1 - (team.staff.disciplineLevel - 1) * 0.1), 0.002, 0.035)
+
+        const gotYellow = isPlayerAvailable(player) && Math.random() < yellowChance
+        const gotRed = isPlayerAvailable(player) && Math.random() < redChance
+
+        let yellowCards = gotYellow ? player.yellowCards + 1 : player.yellowCards
+        if (gotRed) {
+          yellowCards += 1
+        }
+
+        if (gotYellow) {
+          incidents.bookings.push(`${player.name} (${team.name}) vio amarilla.`)
+        }
+
+        if (gotRed) {
+          incidents.reds.push(`${player.name} (${team.name}) fue expulsado.`)
+        }
+
+        let suspensionWeeks = player.suspensionWeeks
+        if (yellowCards >= 5) {
+          suspensionWeeks = Math.max(suspensionWeeks, 1)
+          yellowCards -= 5
+          incidents.suspensions.push(`${player.name} (${team.name}) cumplira 1 partido por acumulacion.`)
+        }
+
+        if (gotRed) {
+          suspensionWeeks = Math.max(suspensionWeeks, 1)
+          incidents.suspensions.push(`${player.name} (${team.name}) quedo sancionado para la proxima jornada.`)
+        }
 
         const injuryWeeks = isPlayerAvailable(player) && Math.random() < injuryChance
-          ? 1 + Math.floor(Math.random() * 3)
+          ? getInjuryDuration(fatigue)
           : player.injuryWeeks
 
-        const suspensionWeeks = isPlayerAvailable(player) && Math.random() < suspensionChance
-          ? 1
-          : player.suspensionWeeks
+        if (injuryWeeks > player.injuryWeeks) {
+          incidents.injuries.push(`${player.name} (${team.name}) se lesiona: ${injuryWeeks} semanas.`)
+        }
 
         return {
           ...player,
@@ -240,10 +319,25 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): Team[] {
           form,
           injuryWeeks,
           suspensionWeeks,
+          yellowCards,
         }
       }),
     }
   })
+
+  return {
+    teams: nextTeams,
+    incidents,
+  }
+}
+
+function makeIncidentHeadlines(incidents: RoundIncidents): string[] {
+  return [
+    ...incidents.injuries.slice(0, 2),
+    ...incidents.suspensions.slice(0, 2),
+    ...incidents.reds.slice(0, 1),
+    ...incidents.bookings.slice(0, 1),
+  ]
 }
 
 function makeRoundHeadline(results: MatchResult[], teamNames: Map<string, string>): string {
@@ -294,7 +388,7 @@ export function playCurrentRound(state: LeagueState, options: PlayRoundOptions):
 
   const updatedTableTeams = updateTeamTable(recoveredTeams, results)
   const revenueTeams = applyMatchDayRevenue(updatedTableTeams, results)
-  const updatedTeams = applyLineupEffects(revenueTeams, packs)
+  const { teams: updatedTeams, incidents } = applyLineupEffects(revenueTeams, packs)
 
   const updatedFixtures = state.fixtures.map((fixture) => {
     const result = results.find((item) => item.fixtureId === fixture.id)
@@ -314,6 +408,7 @@ export function playCurrentRound(state: LeagueState, options: PlayRoundOptions):
   const teamNames = new Map(updatedTeams.map((team) => [team.id, team.name]))
   const headline = makeRoundHeadline(results, teamNames)
   const medicalHeadline = makeMedicalHeadline(updatedTeams)
+  const incidentHeadlines = makeIncidentHeadlines(incidents)
 
   return {
     ...state,
@@ -321,7 +416,7 @@ export function playCurrentRound(state: LeagueState, options: PlayRoundOptions):
     teams: updatedTeams,
     fixtures: updatedFixtures,
     lastResults: results,
-    news: [medicalHeadline, headline, ...state.news].filter(Boolean).slice(0, 12) as string[],
+    news: [...incidentHeadlines, medicalHeadline, headline, ...state.news].filter(Boolean).slice(0, 12) as string[],
   }
 }
 

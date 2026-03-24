@@ -31,6 +31,7 @@ export interface Player {
   fatigue: number
   injuryWeeks: number
   suspensionWeeks: number
+  yellowCards: number
   contractYears: number
 }
 
@@ -59,6 +60,11 @@ export interface SponsorDeal {
   seasonBonusPaid: boolean
 }
 
+export interface ClubStaff {
+  medicalLevel: number
+  disciplineLevel: number
+}
+
 export interface Team {
   id: string
   name: string
@@ -80,6 +86,7 @@ export interface Team {
   players: Player[]
   youthPlayers: YouthPlayer[]
   sponsor: SponsorDeal
+  staff: ClubStaff
   trainingFocus: TrainingFocus
 }
 

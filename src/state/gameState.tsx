@@ -8,6 +8,8 @@ import {
   setStadiumTicketPrice,
   setTeamTactic,
   setTeamTrainingFocus,
+  upgradeDisciplineStaff,
+  upgradeMedicalStaff,
   upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
 import { loadSaveStorage, saveSaveStorage, toGameSummaries } from '../engine/persistence'
@@ -60,6 +62,8 @@ interface GameContextValue {
   promoteYouth: (youthId: string) => void
   setTicketPrice: (price: number) => void
   upgradeStadium: () => void
+  improveMedicalStaff: () => void
+  improveDisciplineStaff: () => void
   clearNotice: () => void
 }
 
@@ -384,6 +388,30 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  const improveMedicalStaff = () => {
+    updateActiveGame((prev) => {
+      const { nextState, message, ok } = upgradeMedicalStaff(prev.leagueState, prev.managerTeamId)
+      setNotice(message)
+      if (!ok) {
+        return prev
+      }
+
+      return { ...prev, leagueState: nextState }
+    })
+  }
+
+  const improveDisciplineStaff = () => {
+    updateActiveGame((prev) => {
+      const { nextState, message, ok } = upgradeDisciplineStaff(prev.leagueState, prev.managerTeamId)
+      setNotice(message)
+      if (!ok) {
+        return prev
+      }
+
+      return { ...prev, leagueState: nextState }
+    })
+  }
+
   const clearNotice = () => setNotice(null)
 
   const value: GameContextValue = {
@@ -411,6 +439,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     promoteYouth,
     setTicketPrice,
     upgradeStadium,
+    improveMedicalStaff,
+    improveDisciplineStaff,
     clearNotice,
   }
 

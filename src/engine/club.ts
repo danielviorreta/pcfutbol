@@ -99,8 +99,18 @@ export function applyWeeklyClubManagement(
 ): { nextState: LeagueState; headlines: string[] } {
   const standings = buildStandingsIndex(state.teams)
   const isSeasonOver = state.currentRound > state.totalRounds
+  const midSeasonRound = Math.floor(state.totalRounds / 2)
+  const isMidSeasonCheckpoint = state.currentRound === midSeasonRound + 1
 
   const headlines: string[] = []
+
+  if (isMidSeasonCheckpoint) {
+    headlines.push('Comite de competicion: se perdonan 2 amarillas a todos los jugadores.')
+  }
+
+  if (isSeasonOver) {
+    headlines.push('Fin de temporada: historial disciplinario reiniciado (amarillas a cero).')
+  }
 
   const nextTeams = state.teams.map((team) => {
     const payroll = Math.round(weeklyPayroll(team))
@@ -115,7 +125,23 @@ export function applyWeeklyClubManagement(
       headlines.push(`${team.name} cobra bonus del sponsor (${sponsor.name}).`)
     }
 
-    const trained = applyTrainingToTeam(team)
+    const cardReduction = isSeasonOver ? Number.POSITIVE_INFINITY : isMidSeasonCheckpoint ? 2 : 0
+
+    const nextPlayers = team.players.map((player) => {
+      if (cardReduction <= 0 || player.yellowCards <= 0) {
+        return player
+      }
+
+      return {
+        ...player,
+        yellowCards: Math.max(0, player.yellowCards - cardReduction),
+      }
+    })
+
+    const trained = applyTrainingToTeam({
+      ...team,
+      players: nextPlayers,
+    })
 
     let { stadium } = trained
     const weeksLeft = stadium.upgradeWeeksRemaining ?? 0
@@ -147,6 +173,102 @@ export function applyWeeklyClubManagement(
       teams: nextTeams,
     },
     headlines,
+  }
+}
+
+function staffUpgradeCost(level: number): number {
+  return 800_000 + level * 600_000
+}
+
+export function upgradeMedicalStaff(
+  state: LeagueState,
+  managerTeamId: string,
+): { nextState: LeagueState; message: string; ok: boolean } {
+  const team = state.teams.find((item) => item.id === managerTeamId)
+
+  if (!team) {
+    return { nextState: state, message: 'Equipo no encontrado.', ok: false }
+  }
+
+  if (team.staff.medicalLevel >= 5) {
+    return { nextState: state, message: 'El cuerpo medico ya esta al maximo (nivel 5).', ok: false }
+  }
+
+  const cost = staffUpgradeCost(team.staff.medicalLevel)
+  if (team.budget < cost) {
+    return {
+      nextState: state,
+      message: `No hay presupuesto para mejorar el cuerpo medico. Coste: ${cost.toLocaleString('es-ES')} €`,
+      ok: false,
+    }
+  }
+
+  const nextState = {
+    ...state,
+    teams: state.teams.map((item) =>
+      item.id !== managerTeamId
+        ? item
+        : {
+            ...item,
+            budget: item.budget - cost,
+            staff: {
+              ...item.staff,
+              medicalLevel: item.staff.medicalLevel + 1,
+            },
+          },
+    ),
+  }
+
+  return {
+    nextState,
+    message: `Cuerpo medico mejorado a nivel ${team.staff.medicalLevel + 1}.`,
+    ok: true,
+  }
+}
+
+export function upgradeDisciplineStaff(
+  state: LeagueState,
+  managerTeamId: string,
+): { nextState: LeagueState; message: string; ok: boolean } {
+  const team = state.teams.find((item) => item.id === managerTeamId)
+
+  if (!team) {
+    return { nextState: state, message: 'Equipo no encontrado.', ok: false }
+  }
+
+  if (team.staff.disciplineLevel >= 5) {
+    return { nextState: state, message: 'El preparador disciplinario ya esta al maximo (nivel 5).', ok: false }
+  }
+
+  const cost = staffUpgradeCost(team.staff.disciplineLevel)
+  if (team.budget < cost) {
+    return {
+      nextState: state,
+      message: `No hay presupuesto para mejorar disciplina. Coste: ${cost.toLocaleString('es-ES')} €`,
+      ok: false,
+    }
+  }
+
+  const nextState = {
+    ...state,
+    teams: state.teams.map((item) =>
+      item.id !== managerTeamId
+        ? item
+        : {
+            ...item,
+            budget: item.budget - cost,
+            staff: {
+              ...item.staff,
+              disciplineLevel: item.staff.disciplineLevel + 1,
+            },
+          },
+    ),
+  }
+
+  return {
+    nextState,
+    message: `Equipo disciplinario mejorado a nivel ${team.staff.disciplineLevel + 1}.`,
+    ok: true,
   }
 }
 
@@ -328,6 +450,7 @@ export function promoteYouthPlayer(
     fatigue: 18,
     injuryWeeks: 0,
     suspensionWeeks: 0,
+    yellowCards: 0,
     contractYears: 3,
   }
 

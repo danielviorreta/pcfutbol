@@ -241,6 +241,7 @@ export function SquadPage() {
               <th>GRL</th>
               <th>Forma</th>
               <th>Fatiga</th>
+                <th>Tarjetas</th>
               <th>Estado</th>
               <th>Contrato</th>
               <th>Valor</th>
@@ -260,6 +261,7 @@ export function SquadPage() {
                     <td>{player.overall}</td>
                     <td>{player.form}</td>
                     <td>{player.fatigue}</td>
+                    <td>{player.yellowCards}</td>
                     <td>
                       {player.injuryWeeks > 0
                         ? `Lesionado (${player.injuryWeeks})`
