@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, type DragEvent } from 'react'
 import { getLineupAssignments, getLineupPlayers, isPlayerAvailable } from '../engine/squad'
 import { useGame } from '../state/gameState'
 import type { Tactic } from '../types/game'
@@ -68,8 +68,35 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
+function getPlayerStatusInfo(injuryWeeks: number, suspensionWeeks: number, yellowCards: number) {
+  if (injuryWeeks > 0) {
+    return {
+      icon: '✚',
+      label: `Lesionado (${injuryWeeks})`,
+      className: 'status-chip is-injured',
+    }
+  }
+
+  if (suspensionWeeks > 0) {
+    const byAccumulation = yellowCards >= 4
+    return {
+      icon: byAccumulation ? '🟨🟨' : '🟥',
+      label: `Sancionado (${suspensionWeeks})`,
+      className: 'status-chip is-suspended',
+    }
+  }
+
+  return {
+    icon: '✓',
+    label: 'Disponible',
+    className: 'status-chip is-available',
+  }
+}
+
 export function SquadPage() {
   const { game, managerTeam, setLineupSlotPlayer, autoPickLineup, setTactic } = useGame()
+  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null)
+  const [dragOverPlayerId, setDragOverPlayerId] = useState<string | null>(null)
 
   const lineupPlayers = useMemo(
     () => (game && managerTeam ? getLineupPlayers(managerTeam, game.managerLineup) : []),
@@ -82,9 +109,6 @@ export function SquadPage() {
   const unavailableCount = managerTeam
     ? managerTeam.players.filter((player) => player.injuryWeeks > 0 || player.suspensionWeeks > 0).length
     : 0
-
-  const selectedBySlot = assignments.map((item) => item.player?.id ?? '')
-  const selectedSet = new Set(selectedBySlot.filter(Boolean))
 
   const tactic = (managerTeam?.tactic ?? '4-3-3') as Tactic
   const roleByPlayerId = useMemo(
@@ -104,14 +128,93 @@ export function SquadPage() {
         )
       : 0
 
-  const sortedPlayers = managerTeam
-    ? managerTeam.players.slice().sort((a, b) => b.overall - a.overall)
-    : []
+  const sortedPlayers = useMemo(() => {
+    if (!managerTeam) {
+      return []
+    }
+
+    const starters = assignments
+      .map((slot) => slot.player)
+      .filter((player): player is NonNullable<typeof player> => Boolean(player))
+    const starterIds = new Set(starters.map((player) => player.id))
+
+    const bench = managerTeam.players
+      .filter((player) => !starterIds.has(player.id))
+      .slice()
+      .sort((a, b) => b.overall - a.overall)
+
+    return [...starters, ...bench]
+  }, [assignments, managerTeam])
 
   const mapCoords = tacticSlotCoords[tactic]
 
   if (!game || !managerTeam) {
     return null
+  }
+
+  const clearDrag = () => {
+    setDraggedPlayerId(null)
+    setDragOverPlayerId(null)
+  }
+
+  const onRowDragStart = (event: DragEvent<HTMLTableRowElement>, playerId: string) => {
+    event.dataTransfer.setData('text/plain', playerId)
+    event.dataTransfer.effectAllowed = 'move'
+    setDraggedPlayerId(playerId)
+  }
+
+  const onRowDragOver = (event: DragEvent<HTMLTableRowElement>, targetPlayerId: string) => {
+    if (!draggedPlayerId || draggedPlayerId === targetPlayerId) {
+      return
+    }
+
+    // At least one of them must be involved in the lineup (starter ↔ bench or starter ↔ starter)
+    const draggedIsStarter = roleByPlayerId.has(draggedPlayerId)
+    const targetIsStarter = roleByPlayerId.has(targetPlayerId)
+    if (!draggedIsStarter && !targetIsStarter) {
+      return
+    }
+
+    // The player moving INTO a starter slot must be available
+    const incomingToStarterSlot = draggedIsStarter ? null : draggedPlayerId
+    if (incomingToStarterSlot) {
+      const player = managerTeam.players.find((p) => p.id === incomingToStarterSlot)
+      if (!player || !isPlayerAvailable(player)) {
+        return
+      }
+    }
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverPlayerId(targetPlayerId)
+  }
+
+  const onRowDrop = (event: DragEvent<HTMLTableRowElement>, targetPlayerId: string) => {
+    event.preventDefault()
+    const sourceId = draggedPlayerId || event.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === targetPlayerId) {
+      clearDrag()
+      return
+    }
+
+    const targetAssignment = roleByPlayerId.get(targetPlayerId)
+    const sourceAssignment = roleByPlayerId.get(sourceId)
+
+    if (targetAssignment) {
+      // Drop onto a starter row: put source player in that slot (state handles internal swap)
+      const sourcePlayer = managerTeam.players.find((p) => p.id === sourceId)
+      if (sourcePlayer && isPlayerAvailable(sourcePlayer)) {
+        setLineupSlotPlayer(targetAssignment.slotIndex, sourceId)
+      }
+    } else if (sourceAssignment) {
+      // Source is a starter, target is bench: put target player in source's slot
+      const targetPlayer = managerTeam.players.find((p) => p.id === targetPlayerId)
+      if (targetPlayer && isPlayerAvailable(targetPlayer)) {
+        setLineupSlotPlayer(sourceAssignment.slotIndex, targetPlayerId)
+      }
+    }
+
+    clearDrag()
   }
 
   return (
@@ -148,7 +251,7 @@ export function SquadPage() {
       </article>
 
       <article className="panel full-span">
-        <h2>Mapa de la Tactica</h2>
+        <h2>Pizarra Tactica — {managerTeam.tactic ?? '4-3-3'}</h2>
         <div className="tactic-map">
           <span className="pitch-mark outer" aria-hidden="true" />
           <span className="pitch-mark halfway" aria-hidden="true" />
@@ -179,79 +282,26 @@ export function SquadPage() {
         </div>
       </article>
 
-      <article className="panel full-span">
-        <h2>Pizarra Tactica ({managerTeam.tactic ?? '4-3-3'})</h2>
-        <div className="pitch-board">
-          {assignments.map((slot) => {
-            const currentId = slot.player?.id ?? ''
-            const availableOptions = sortedPlayers.filter((player) => {
-              if (!isPlayerAvailable(player)) {
-                return false
-              }
-
-              return player.id === currentId || !selectedSet.has(player.id)
-            })
-
-            return (
-              <div className="pitch-slot" key={`${slot.role}-${slot.slotIndex}`}>
-                <div className="pitch-slot-head">
-                  <p className="pitch-slot-role">{slot.role}</p>
-                  <div className="mini-role-pitch" aria-hidden="true">
-                    <span className="mini-pitch-mark mini-outer" />
-                    <span className="mini-pitch-mark mini-half" />
-                    <span className="mini-pitch-mark mini-circle" />
-                    <span className="mini-pitch-mark mini-top-box" />
-                    <span className="mini-pitch-mark mini-bottom-box" />
-                    <span className="mini-pitch-mark mini-top-arc" />
-                    <span className="mini-pitch-mark mini-bottom-arc" />
-                    <span
-                      className="mini-role-dot"
-                      style={{
-                        left: `${(mapCoords[slot.slotIndex]?.x ?? 50) * 0.88 + 6}%`,
-                        top: `${(mapCoords[slot.slotIndex]?.y ?? 50) * 0.88 + 6}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-                <select
-                  value={currentId}
-                  onChange={(event) => setLineupSlotPlayer(slot.slotIndex, event.target.value)}
-                >
-                  {availableOptions.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.name}
-                    </option>
-                  ))}
-                </select>
-                {slot.player && (
-                  <p className="pitch-slot-grl">
-                    GRL en rol: <strong>{slot.effectiveOverall}</strong> ({Math.round(slot.fit * 100)}%)
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </article>
-
       <article className="panel table-panel full-span">
         <h2>
           Plantilla de {managerTeam.name}
           {' '}
           <span className="competition-badge inline-badge">{managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</span>
         </h2>
+        <p className="squad-hint">
+          Arrastra un jugador sobre otro para intercambiarlos. Los titulares aparecen marcados al inicio de la lista.
+        </p>
         <table>
           <thead>
             <tr>
+              <th></th>
               <th>Jugador</th>
               <th>Pos</th>
-              <th>Rol XI</th>
               <th>GRL XI</th>
-              <th>Mejor Pos.</th>
               <th>GRL</th>
               <th>Forma</th>
               <th>Fatiga</th>
-                <th>Tarjetas</th>
+              <th>Tarjetas</th>
               <th>Estado</th>
               <th>Contrato</th>
               <th>Valor</th>
@@ -260,30 +310,53 @@ export function SquadPage() {
           <tbody>
             {sortedPlayers.map((player) => {
               const assigned = roleByPlayerId.get(player.id)
+              const status = getPlayerStatusInfo(player.injuryWeeks, player.suspensionWeeks, player.yellowCards)
+              const available = isPlayerAvailable(player)
+              const isDragging = draggedPlayerId === player.id
+              const isDragOver = dragOverPlayerId === player.id
 
-                return (
-                  <tr key={player.id}>
-                    <td>{player.name}</td>
-                    <td>{player.position}</td>
-                    <td>{assigned?.role ?? '-'}</td>
-                    <td>{assigned ? assigned.effectiveOverall : '-'}</td>
-                    <td>{player.naturalPositions?.join('/') ?? player.position}</td>
-                    <td>{player.overall}</td>
-                    <td>{player.form}</td>
-                    <td>{player.fatigue}</td>
-                    <td>{player.yellowCards}</td>
-                    <td>
-                      {player.injuryWeeks > 0
-                        ? `Lesionado (${player.injuryWeeks})`
-                        : player.suspensionWeeks > 0
-                          ? `Sancionado (${player.suspensionWeeks})`
-                          : 'Disponible'}
-                    </td>
-                    <td>{player.contractYears}</td>
-                    <td>{formatCurrency(player.value)}</td>
-                  </tr>
-                )
-              })}
+              return (
+                <tr
+                  key={player.id}
+                  className={[
+                    'squad-row',
+                    assigned ? 'is-starter' : '',
+                    !available ? 'is-unavailable' : '',
+                    isDragging ? 'is-dragging' : '',
+                    isDragOver ? 'is-drag-over' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  draggable={available}
+                  onDragStart={(event) => onRowDragStart(event, player.id)}
+                  onDragOver={(event) => onRowDragOver(event, player.id)}
+                  onDragLeave={() => setDragOverPlayerId(null)}
+                  onDrop={(event) => onRowDrop(event, player.id)}
+                  onDragEnd={clearDrag}
+                >
+                  <td className="drag-handle" aria-hidden="true">⠿</td>
+                  <td>
+                    <span className="player-name-cell">
+                      {assigned && (
+                        <span className="role-badge">{assigned.role}</span>
+                      )}
+                      {player.name}
+                    </span>
+                  </td>
+                  <td>{player.position}</td>
+                  <td>{assigned ? assigned.effectiveOverall : '—'}</td>
+                  <td>{player.overall}</td>
+                  <td>{player.form}</td>
+                  <td>{player.fatigue}</td>
+                  <td>{player.yellowCards}</td>
+                  <td>
+                    <span className={status.className}>{status.icon} {status.label}</span>
+                  </td>
+                  <td>{player.contractYears}</td>
+                  <td>{formatCurrency(player.value)}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </article>
