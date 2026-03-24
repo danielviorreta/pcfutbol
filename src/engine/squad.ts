@@ -1,10 +1,89 @@
-import type { Player, Position, Team } from '../types/game'
+import type { Player, Position, RolePosition, Tactic, Team } from '../types/game'
 
-const defaultShape: Record<Position, number> = {
-  GK: 1,
-  DEF: 4,
-  MID: 3,
-  FWD: 3,
+const formationSlots: Record<Tactic, RolePosition[]> = {
+  '4-3-3': ['GK', 'RB', 'CB', 'CB', 'LB', 'DM', 'CM', 'AM', 'RW', 'ST', 'LW'],
+  '4-4-2': ['GK', 'RB', 'CB', 'CB', 'LB', 'RM', 'CM', 'CM', 'LM', 'ST', 'ST'],
+  '5-4-1': ['GK', 'RWB', 'CB', 'CB', 'CB', 'LWB', 'RM', 'CM', 'CM', 'LM', 'ST'],
+}
+
+function getTeamTactic(team: Team): Tactic {
+  return team.tactic ?? '4-3-3'
+}
+
+export function getFormationSlots(team: Team): RolePosition[] {
+  return formationSlots[getTeamTactic(team)]
+}
+
+function roleToLine(role: RolePosition): Position {
+  if (role === 'GK') {
+    return 'GK'
+  }
+
+  if (['RB', 'CB', 'LB', 'RWB', 'LWB'].includes(role)) {
+    return 'DEF'
+  }
+
+  if (['DM', 'CM', 'AM', 'RM', 'LM'].includes(role)) {
+    return 'MID'
+  }
+
+  return 'FWD'
+}
+
+function fallbackNaturalPositions(position: Position): RolePosition[] {
+  switch (position) {
+    case 'GK':
+      return ['GK']
+    case 'DEF':
+      return ['CB', 'RB']
+    case 'MID':
+      return ['CM', 'DM']
+    case 'FWD':
+      return ['ST', 'CF']
+    default:
+      return ['CM']
+  }
+}
+
+function getNaturalPositions(player: Player): RolePosition[] {
+  return player.naturalPositions && player.naturalPositions.length > 0
+    ? player.naturalPositions
+    : fallbackNaturalPositions(player.position)
+}
+
+export function getRoleFit(player: Player, targetRole: RolePosition): number {
+  const natural = getNaturalPositions(player)
+
+  if (natural[0] === targetRole) {
+    return 1
+  }
+
+  if (natural.includes(targetRole)) {
+    return 0.92
+  }
+
+  const playerLine = roleToLine(natural[0])
+  const targetLine = roleToLine(targetRole)
+
+  if (playerLine === targetLine) {
+    return 0.82
+  }
+
+  const lineDistance =
+    Math.abs(
+      ['DEF', 'MID', 'FWD'].indexOf(playerLine) -
+      ['DEF', 'MID', 'FWD'].indexOf(targetLine),
+    )
+
+  if (playerLine === 'GK' || targetLine === 'GK') {
+    return 0.55
+  }
+
+  return lineDistance <= 1 ? 0.68 : 0.52
+}
+
+export function getEffectiveOverall(player: Player, targetRole: RolePosition): number {
+  return Math.round(player.overall * getRoleFit(player, targetRole))
 }
 
 function sortPlayers(players: Player[]): Player[] {
@@ -15,31 +94,56 @@ export function isPlayerAvailable(player: Player): boolean {
   return player.injuryWeeks <= 0 && player.suspensionWeeks <= 0
 }
 
-function getBestAvailableByPosition(team: Team, position: Position, needed: number): Player[] {
-  return sortPlayers(team.players)
-    .filter((player) => player.position === position && isPlayerAvailable(player))
-    .slice(0, needed)
+function pickBestLineupForSlots(team: Team, slots: RolePosition[]): Player[] {
+  const available = sortPlayers(team.players).filter((player) => isPlayerAvailable(player))
+  const selected: Player[] = []
+  const used = new Set<string>()
+
+  for (const slot of slots) {
+    let best: Player | null = null
+    let bestScore = Number.NEGATIVE_INFINITY
+
+    for (const player of available) {
+      if (used.has(player.id)) {
+        continue
+      }
+
+      const fit = getRoleFit(player, slot)
+      const score = player.overall * fit + player.form * 0.18 - player.fatigue * 0.08
+
+      if (score > bestScore) {
+        bestScore = score
+        best = player
+      }
+    }
+
+    if (!best) {
+      continue
+    }
+
+    selected.push(best)
+    used.add(best.id)
+  }
+
+  if (selected.length < 11) {
+    for (const player of available) {
+      if (used.has(player.id)) {
+        continue
+      }
+      selected.push(player)
+      used.add(player.id)
+      if (selected.length === 11) {
+        break
+      }
+    }
+  }
+
+  return selected.slice(0, 11)
 }
 
 export function getDefaultLineup(team: Team): string[] {
-  const selected: Player[] = []
-
-  for (const [position, needed] of Object.entries(defaultShape) as [Position, number][]) {
-    selected.push(...getBestAvailableByPosition(team, position, needed))
-  }
-
-  const unique = [...new Set(selected.map((player) => player.id))]
-
-  if (unique.length < 11) {
-    const fallback = sortPlayers(team.players)
-      .filter((player) => isPlayerAvailable(player) && !unique.includes(player.id))
-      .slice(0, 11 - unique.length)
-      .map((player) => player.id)
-
-    return [...unique, ...fallback]
-  }
-
-  return unique.slice(0, 11)
+  const slots = getFormationSlots(team)
+  return pickBestLineupForSlots(team, slots).map((player) => player.id)
 }
 
 export function normalizeLineup(team: Team, lineupIds: string[]): string[] {
@@ -52,18 +156,12 @@ export function normalizeLineup(team: Team, lineupIds: string[]): string[] {
     return getDefaultLineup(team)
   }
 
-  const players = validIds
-    .map((playerId) => team.players.find((player) => player.id === playerId))
-    .filter((player): player is Player => Boolean(player))
+  const hasGoalkeeper = validIds.some((id) => {
+    const player = team.players.find((candidate) => candidate.id === id)
+    return player ? getNaturalPositions(player).includes('GK') : false
+  })
 
-  const counts: Record<Position, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 }
-  for (const player of players) {
-    counts[player.position] += 1
-  }
-
-  const shapeMatches = counts.GK >= 1 && counts.DEF >= 3 && counts.MID >= 2 && counts.FWD >= 1
-
-  return shapeMatches ? validIds : getDefaultLineup(team)
+  return hasGoalkeeper ? validIds : getDefaultLineup(team)
 }
 
 export function canToggleInLineup(team: Team, lineupIds: string[], playerId: string): boolean {
@@ -87,6 +185,33 @@ export function getLineupPlayers(team: Team, lineupIds: string[]): Player[] {
     .filter((player): player is Player => Boolean(player))
 }
 
+export interface LineupAssignment {
+  slotIndex: number
+  role: RolePosition
+  player: Player | null
+  fit: number
+  effectiveOverall: number
+}
+
+export function getLineupAssignments(team: Team, lineupIds: string[]): LineupAssignment[] {
+  const slots = getFormationSlots(team)
+  const normalized = normalizeLineup(team, lineupIds)
+
+  return slots.map((role, slotIndex) => {
+    const playerId = normalized[slotIndex]
+    const player = team.players.find((candidate) => candidate.id === playerId) ?? null
+    const fit = player ? getRoleFit(player, role) : 0
+
+    return {
+      slotIndex,
+      role,
+      player,
+      fit,
+      effectiveOverall: player ? getEffectiveOverall(player, role) : 0,
+    }
+  })
+}
+
 export function getTeamRatings(
   team: Team,
   lineupIds: string[],
@@ -95,22 +220,30 @@ export function getTeamRatings(
   midfield: number
   defense: number
 } {
-  const lineup = getLineupPlayers(team, lineupIds)
+  const assignments = getLineupAssignments(team, lineupIds)
 
-  const aggregate = lineup.reduce(
-    (acc, player) => {
+  const aggregate = assignments.reduce(
+    (acc, item) => {
+      const { player, role, fit } = item
+      if (!player) {
+        return acc
+      }
+
       const fatiguePenalty = player.fatigue * 0.25
-      const score = player.overall * 0.72 + player.form * 0.22 + player.stamina * 0.12 - fatiguePenalty
+      const baseScore =
+        player.overall * 0.72 + player.form * 0.22 + player.stamina * 0.12 - fatiguePenalty
+      const score = baseScore * fit
+      const line = roleToLine(role)
 
-      if (player.position === 'FWD') {
+      if (line === 'FWD') {
         acc.attack += score
       }
 
-      if (player.position === 'MID') {
+      if (line === 'MID') {
         acc.midfield += score
       }
 
-      if (player.position === 'DEF' || player.position === 'GK') {
+      if (line === 'DEF' || line === 'GK') {
         acc.defense += score
       }
 

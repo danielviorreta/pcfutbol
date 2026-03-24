@@ -5,15 +5,23 @@ import {
   applyWeeklyClubManagement,
   promoteYouthPlayer,
   renewPlayerContract,
+  setTeamTactic,
   setTeamTrainingFocus,
 } from '../engine/club'
 import { loadSaveStorage, saveSaveStorage, toGameSummaries } from '../engine/persistence'
 import { playCurrentRound, sortLeagueTable } from '../engine/simulation'
-import { canToggleInLineup, getDefaultLineup, normalizeLineup } from '../engine/squad'
+import {
+  canToggleInLineup,
+  getDefaultLineup,
+  getFormationSlots,
+  isPlayerAvailable,
+  normalizeLineup,
+} from '../engine/squad'
 import { buyPlayer, getTransferTargets } from '../engine/transfers'
 import type {
   GameSummary,
   ManagerGameState,
+  Tactic,
   Team,
   TrainingFocus,
   TransferTarget,
@@ -40,10 +48,12 @@ interface GameContextValue {
   playRound: () => void
   resetGame: () => void
   toggleLineupPlayer: (playerId: string) => void
+  setLineupSlotPlayer: (slotIndex: number, playerId: string) => void
   autoPickLineup: () => void
   purchasePlayer: (playerId: string) => void
   saveCurrentGame: () => void
   setTrainingFocus: (focus: TrainingFocus) => void
+  setTactic: (tactic: Tactic) => void
   renewContract: (playerId: string) => void
   promoteYouth: (youthId: string) => void
   clearNotice: () => void
@@ -226,6 +236,41 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  const setLineupSlotPlayer = (slotIndex: number, playerId: string) => {
+    updateActiveGame((prev) => {
+      const currentTeam = getManagerTeam(prev)
+      if (!currentTeam) {
+        return prev
+      }
+
+      const player = currentTeam.players.find((candidate) => candidate.id === playerId)
+      if (!player || !isPlayerAvailable(player)) {
+        setNotice('Jugador no disponible para este rol.')
+        return prev
+      }
+
+      const slots = getFormationSlots(currentTeam)
+      if (slotIndex < 0 || slotIndex >= slots.length) {
+        return prev
+      }
+
+      const normalized = normalizeLineup(currentTeam, prev.managerLineup)
+      const nextLineup = [...normalized]
+      const existingIndex = nextLineup.findIndex((id, idx) => id === playerId && idx !== slotIndex)
+      const previousAtSlot = nextLineup[slotIndex]
+
+      nextLineup[slotIndex] = playerId
+      if (existingIndex >= 0) {
+        nextLineup[existingIndex] = previousAtSlot
+      }
+
+      return {
+        ...prev,
+        managerLineup: normalizeLineup(currentTeam, nextLineup),
+      }
+    })
+  }
+
   const purchasePlayer = (playerId: string) => {
     updateActiveGame((prev) => {
       const { nextState, message, ok } = buyPlayer(prev.leagueState, prev.managerTeamId, playerId)
@@ -264,6 +309,22 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       leagueState: setTeamTrainingFocus(prev.leagueState, prev.managerTeamId, focus),
     }))
     setNotice(`Plan de entrenamiento actualizado: ${focus}.`)
+  }
+
+  const setTactic = (tactic: Tactic) => {
+    updateActiveGame((prev) => {
+      const nextLeagueState = setTeamTactic(prev.leagueState, prev.managerTeamId, tactic)
+      const nextManagerTeam =
+        nextLeagueState.teams.find((team) => team.id === prev.managerTeamId) ??
+        nextLeagueState.teams[0]
+
+      return {
+        ...prev,
+        leagueState: nextLeagueState,
+        managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
+      }
+    })
+    setNotice(`Tactica actualizada: ${tactic}.`)
   }
 
   const renewContract = (playerId: string) => {
@@ -316,10 +377,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     playRound,
     resetGame,
     toggleLineupPlayer,
+    setLineupSlotPlayer,
     autoPickLineup,
     purchasePlayer,
     saveCurrentGame,
     setTrainingFocus,
+    setTactic,
     renewContract,
     promoteYouth,
     clearNotice,

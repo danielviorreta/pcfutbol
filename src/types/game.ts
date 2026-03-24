@@ -1,10 +1,28 @@
 export type Position = 'GK' | 'DEF' | 'MID' | 'FWD'
+export type RolePosition =
+  | 'GK'
+  | 'RB'
+  | 'CB'
+  | 'LB'
+  | 'RWB'
+  | 'LWB'
+  | 'DM'
+  | 'CM'
+  | 'AM'
+  | 'RM'
+  | 'LM'
+  | 'RW'
+  | 'LW'
+  | 'CF'
+  | 'ST'
+export type Tactic = '4-3-3' | '4-4-2' | '5-4-1'
 export type TrainingFocus = 'fitness' | 'attack' | 'midfield' | 'defense'
 
 export interface Player {
   id: string
   name: string
   position: Position
+  naturalPositions?: RolePosition[]
   overall: number
   value: number
   wage: number
@@ -38,6 +56,7 @@ export interface Team {
   id: string
   name: string
   crestUrl?: string
+  tactic: Tactic
   budget: number
   morale: number
   attack: number

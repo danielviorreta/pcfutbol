@@ -1,5 +1,5 @@
 import { useGame } from '../state/gameState'
-import type { TrainingFocus } from '../types/game'
+import type { Tactic, TrainingFocus } from '../types/game'
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-ES', {
@@ -16,8 +16,14 @@ const focusOptions: { value: TrainingFocus; label: string }[] = [
   { value: 'defense', label: 'Defensa' },
 ]
 
+const tacticOptions: { value: Tactic; label: string }[] = [
+  { value: '4-3-3', label: '4-3-3' },
+  { value: '4-4-2', label: '4-4-2' },
+  { value: '5-4-1', label: '5-4-1' },
+]
+
 export function ClubPage() {
-  const { managerTeam, setTrainingFocus, renewContract, promoteYouth } = useGame()
+  const { managerTeam, setTrainingFocus, setTactic, renewContract, promoteYouth } = useGame()
 
   if (!managerTeam) {
     return null
@@ -50,6 +56,23 @@ export function ClubPage() {
               className="secondary"
               onClick={() => setTrainingFocus(option.value)}
               disabled={managerTeam.trainingFocus === option.value}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </article>
+
+      <article className="panel">
+        <h2>Tactica</h2>
+        <p>Sistema actual: <strong>{managerTeam.tactic ?? '4-3-3'}</strong></p>
+        <div className="actions">
+          {tacticOptions.map((option) => (
+            <button
+              key={option.value}
+              className="secondary"
+              onClick={() => setTactic(option.value)}
+              disabled={(managerTeam.tactic ?? '4-3-3') === option.value}
             >
               {option.label}
             </button>

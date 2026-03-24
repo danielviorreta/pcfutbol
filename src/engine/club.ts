@@ -1,4 +1,4 @@
-import type { LeagueState, Position, Team, TrainingFocus } from '../types/game'
+import type { LeagueState, Position, Tactic, Team, TrainingFocus } from '../types/game'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -141,6 +141,19 @@ export function setTeamTrainingFocus(
     ...state,
     teams: state.teams.map((team) =>
       team.id === managerTeamId ? { ...team, trainingFocus: focus } : team,
+    ),
+  }
+}
+
+export function setTeamTactic(
+  state: LeagueState,
+  managerTeamId: string,
+  tactic: Tactic,
+): LeagueState {
+  return {
+    ...state,
+    teams: state.teams.map((team) =>
+      team.id === managerTeamId ? { ...team, tactic } : team,
     ),
   }
 }

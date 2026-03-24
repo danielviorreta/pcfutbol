@@ -2,6 +2,8 @@ import type {
   LeagueState,
   Player,
   Position,
+  RolePosition,
+  Tactic,
   Team,
   TrainingFocus,
   YouthPlayer,
@@ -19,6 +21,7 @@ type TeamSeed = Omit<
   | 'players'
   | 'youthPlayers'
   | 'sponsor'
+  | 'tactic'
   | 'trainingFocus'
 >
 
@@ -226,6 +229,7 @@ const baseTeams: TeamSeed[] = [
 ]
 
 const trainingFocusCycle: TrainingFocus[] = ['fitness', 'attack', 'midfield', 'defense']
+const tacticCycle: Tactic[] = ['4-3-3', '4-4-2', '5-4-1']
 
 const firstNames = [
   'Iker', 'Raul', 'Pablo', 'Luis', 'Fernando', 'Miguel', 'Javier', 'Sergio', 'Diego',
@@ -290,6 +294,43 @@ const squadShape = [
 ] as const
 
 type RosterEntry = { name: string; position: Position }
+
+const rolePools: Record<Position, RolePosition[]> = {
+  GK: ['GK'],
+  DEF: ['RB', 'CB', 'CB', 'LB', 'RWB', 'LWB'],
+  MID: ['DM', 'CM', 'CM', 'AM', 'RM', 'LM'],
+  FWD: ['RW', 'LW', 'ST', 'CF'],
+}
+
+const secondaryRolesByPrimary: Record<RolePosition, RolePosition[]> = {
+  GK: ['GK'],
+  RB: ['RWB', 'LB'],
+  CB: ['DM'],
+  LB: ['LWB', 'RB'],
+  RWB: ['RB', 'RM'],
+  LWB: ['LB', 'LM'],
+  DM: ['CM', 'CB'],
+  CM: ['DM', 'AM'],
+  AM: ['CM', 'CF'],
+  RM: ['RW', 'CM'],
+  LM: ['LW', 'CM'],
+  RW: ['RM', 'CF'],
+  LW: ['LM', 'CF'],
+  CF: ['ST', 'AM'],
+  ST: ['CF', 'RW'],
+}
+
+function inferNaturalPositions(basePosition: Position, playerIndex: number): RolePosition[] {
+  const pool = rolePools[basePosition]
+  const primary = pool[playerIndex % pool.length]
+
+  if (basePosition === 'GK') {
+    return ['GK']
+  }
+
+  const secondary = secondaryRolesByPrimary[primary][0]
+  return secondary ? [primary, secondary] : [primary]
+}
 
 const playerOverallOverrides: Record<string, number> = {
   'Kylian Mbappe': 91,
@@ -771,11 +812,13 @@ function buildPlayer(team: TeamSeed, teamIndex: number, playerIndex: number): Pl
   const overall = roster?.name ? playerOverallOverrides[roster.name] ?? fallbackOverall : fallbackOverall
 
   const playerName = roster?.name ?? buildPlayerName(seed + teamIndex * 10)
+  const naturalPositions = inferNaturalPositions(position, playerIndex)
 
   return {
     id: `${team.id}-p${playerIndex + 1}`,
     name: playerName,
     position,
+    naturalPositions,
     overall,
     value: Math.round(overall * overall * 14_500),
     wage: Math.round(overall * 12_000 + (seed % 90_000)),
@@ -824,6 +867,7 @@ function toTeam(base: TeamSeed, teamIndex: number): Team {
       seasonBonus: 2_800_000 - teamIndex * 180_000,
       seasonBonusPaid: false,
     },
+    tactic: tacticCycle[teamIndex % tacticCycle.length],
     trainingFocus: trainingFocusCycle[teamIndex % trainingFocusCycle.length],
   }
 }
