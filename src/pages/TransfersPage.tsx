@@ -20,6 +20,9 @@ export function TransfersPage() {
       <article className="panel">
         <h2>Mercado</h2>
         <p>
+          Competicion: <span className="competition-badge">{managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</span>
+        </p>
+        <p>
           Presupuesto actual: <strong>{formatCurrency(managerTeam.budget)}</strong>
         </p>
         <p>

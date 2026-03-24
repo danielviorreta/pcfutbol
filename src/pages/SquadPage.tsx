@@ -229,7 +229,11 @@ export function SquadPage() {
       </article>
 
       <article className="panel table-panel full-span">
-        <h2>Plantilla de {managerTeam.name}</h2>
+        <h2>
+          Plantilla de {managerTeam.name}
+          {' '}
+          <span className="competition-badge inline-badge">{managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</span>
+        </h2>
         <table>
           <thead>
             <tr>

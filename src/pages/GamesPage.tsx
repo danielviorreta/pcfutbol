@@ -50,7 +50,7 @@ export function GamesPage() {
             <select value={managerTeamId} onChange={(event) => setManagerTeamId(event.target.value)}>
               {clubs.map((club) => (
                 <option key={club.id} value={club.id}>
-                  {club.name}
+                  {club.name} ({club.division}{club.group ? ` - ${club.group}` : ''})
                 </option>
               ))}
             </select>

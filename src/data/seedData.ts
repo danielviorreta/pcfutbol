@@ -1,4 +1,6 @@
 import type {
+  CompetitionGroup,
+  Division,
   LeagueState,
   Player,
   Position,
@@ -11,6 +13,7 @@ import type {
 
 type TeamSeed = Omit<
   Team,
+  | 'division'
   | 'points'
   | 'played'
   | 'wins'
@@ -25,6 +28,8 @@ type TeamSeed = Omit<
   | 'tactic'
   | 'trainingFocus'
 >
+
+type TeamSeedWithDivision = TeamSeed & { division: Division; group?: CompetitionGroup }
 
 const baseTeams: TeamSeed[] = [
   {
@@ -249,6 +254,75 @@ const baseTeams: TeamSeed[] = [
   },
 ]
 
+const segundaTeams: TeamSeed[] = [
+  { id: 'lev', name: 'Levante UD', crestUrl: 'https://icons.duckduckgo.com/ip3/levanteud.com.ico', stadium: { name: 'Ciutat de Valencia', capacity: 26_354, ticketPrice: 24 }, budget: 24_000_000, morale: 70, attack: 73, midfield: 72, defense: 71 },
+  { id: 'eib', name: 'SD Eibar', crestUrl: 'https://icons.duckduckgo.com/ip3/sdeibar.com.ico', stadium: { name: 'Ipurua', capacity: 8_164, ticketPrice: 22 }, budget: 19_000_000, morale: 69, attack: 72, midfield: 71, defense: 72 },
+  { id: 'ten', name: 'CD Tenerife', crestUrl: 'https://icons.duckduckgo.com/ip3/cdtenerife.es.ico', stadium: { name: 'Heliodoro Rodriguez Lopez', capacity: 22_824, ticketPrice: 20 }, budget: 18_000_000, morale: 68, attack: 70, midfield: 70, defense: 69 },
+  { id: 'zar', name: 'Real Zaragoza', crestUrl: 'https://icons.duckduckgo.com/ip3/realzaragoza.com.ico', stadium: { name: 'La Romareda', capacity: 33_608, ticketPrice: 22 }, budget: 21_000_000, morale: 69, attack: 71, midfield: 71, defense: 70 },
+  { id: 'ovi', name: 'Real Oviedo', crestUrl: 'https://icons.duckduckgo.com/ip3/realoviedo.es.ico', stadium: { name: 'Carlos Tartiere', capacity: 30_500, ticketPrice: 22 }, budget: 20_000_000, morale: 69, attack: 71, midfield: 70, defense: 70 },
+  { id: 'spo', name: 'Sporting Gijon', crestUrl: 'https://icons.duckduckgo.com/ip3/realsporting.com.ico', stadium: { name: 'El Molinon', capacity: 29_029, ticketPrice: 22 }, budget: 20_000_000, morale: 69, attack: 71, midfield: 70, defense: 70 },
+  { id: 'rac', name: 'Racing Santander', crestUrl: 'https://icons.duckduckgo.com/ip3/realracingclub.es.ico', stadium: { name: 'El Sardinero', capacity: 22_271, ticketPrice: 20 }, budget: 17_000_000, morale: 68, attack: 69, midfield: 69, defense: 68 },
+  { id: 'alb', name: 'Albacete Balompie', crestUrl: 'https://icons.duckduckgo.com/ip3/albacetebalompie.es.ico', stadium: { name: 'Carlos Belmonte', capacity: 17_524, ticketPrice: 18 }, budget: 16_000_000, morale: 67, attack: 68, midfield: 68, defense: 67 },
+  { id: 'bur', name: 'Burgos CF', crestUrl: 'https://icons.duckduckgo.com/ip3/burgoscf.es.ico', stadium: { name: 'El Plantio', capacity: 12_642, ticketPrice: 18 }, budget: 15_000_000, morale: 67, attack: 67, midfield: 67, defense: 68 },
+  { id: 'car', name: 'FC Cartagena', crestUrl: 'https://icons.duckduckgo.com/ip3/fccartagena.es.ico', stadium: { name: 'Cartagonova', capacity: 15_105, ticketPrice: 18 }, budget: 14_000_000, morale: 66, attack: 66, midfield: 67, defense: 66 },
+  { id: 'mir', name: 'CD Mirandes', crestUrl: 'https://icons.duckduckgo.com/ip3/cdmirandes.com.ico', stadium: { name: 'Anduva', capacity: 5_759, ticketPrice: 16 }, budget: 13_000_000, morale: 66, attack: 66, midfield: 66, defense: 66 },
+  { id: 'dep', name: 'Deportivo La Coruna', crestUrl: 'https://icons.duckduckgo.com/ip3/rcdeportivo.es.ico', stadium: { name: 'Riazor', capacity: 32_490, ticketPrice: 21 }, budget: 19_000_000, morale: 68, attack: 69, midfield: 69, defense: 69 },
+  { id: 'hue', name: 'SD Huesca', crestUrl: 'https://icons.duckduckgo.com/ip3/sdhuesca.es.ico', stadium: { name: 'El Alcoraz', capacity: 9_100, ticketPrice: 17 }, budget: 14_500_000, morale: 66, attack: 67, midfield: 67, defense: 67 },
+  { id: 'and', name: 'FC Andorra', crestUrl: 'https://icons.duckduckgo.com/ip3/fcandorra.com.ico', stadium: { name: 'Estadi Nacional', capacity: 3_306, ticketPrice: 16 }, budget: 13_000_000, morale: 65, attack: 66, midfield: 66, defense: 65 },
+  { id: 'pon', name: 'Ponferradina', crestUrl: 'https://icons.duckduckgo.com/ip3/clubdeportivaponferradina.com.ico', stadium: { name: 'El Toralin', capacity: 8_400, ticketPrice: 16 }, budget: 12_500_000, morale: 65, attack: 65, midfield: 65, defense: 65 },
+  { id: 'lug', name: 'CD Lugo', crestUrl: 'https://icons.duckduckgo.com/ip3/cdlugo.com.ico', stadium: { name: 'Anxo Carro', capacity: 7_070, ticketPrice: 15 }, budget: 12_000_000, morale: 64, attack: 65, midfield: 64, defense: 65 },
+  { id: 'cas', name: 'CD Castellon', crestUrl: 'https://icons.duckduckgo.com/ip3/cdcastellon.com.ico', stadium: { name: 'Castalia', capacity: 14_485, ticketPrice: 16 }, budget: 12_800_000, morale: 65, attack: 65, midfield: 65, defense: 65 },
+  { id: 'fer', name: 'Racing Ferrol', crestUrl: 'https://icons.duckduckgo.com/ip3/racingclubferrol.net.ico', stadium: { name: 'A Malata', capacity: 11_669, ticketPrice: 16 }, budget: 12_000_000, morale: 64, attack: 64, midfield: 64, defense: 65 },
+  { id: 'eld', name: 'CD Eldense', crestUrl: 'https://icons.duckduckgo.com/ip3/cdeldense.es.ico', stadium: { name: 'Nuevo Pepico Amat', capacity: 5_766, ticketPrice: 15 }, budget: 11_000_000, morale: 63, attack: 64, midfield: 64, defense: 64 },
+  { id: 'leg', name: 'CD Leganes', crestUrl: 'https://icons.duckduckgo.com/ip3/cdleganes.com.ico', stadium: { name: 'Butarque', capacity: 12_450, ticketPrice: 18 }, budget: 16_000_000, morale: 67, attack: 68, midfield: 68, defense: 69 },
+]
+
+const primeraFederacionGroupOneTeams: TeamSeed[] = [
+  { id: 'cul', name: 'Cultural Leonesa', crestUrl: 'https://icons.duckduckgo.com/ip3/cydleonesa.com.ico', stadium: { name: 'Reino de Leon', capacity: 13_451, ticketPrice: 14 }, budget: 9_000_000, morale: 64, attack: 64, midfield: 64, defense: 64 },
+  { id: 'mur', name: 'Real Murcia', crestUrl: 'https://icons.duckduckgo.com/ip3/realmurcia.es.ico', stadium: { name: 'Nueva Condomina', capacity: 31_179, ticketPrice: 15 }, budget: 10_500_000, morale: 65, attack: 65, midfield: 65, defense: 65 },
+  { id: 'nat', name: 'Nastic de Tarragona', crestUrl: 'https://icons.duckduckgo.com/ip3/gimnasticdetarragona.cat.ico', stadium: { name: 'Nou Estadi Costa Daurada', capacity: 14_591, ticketPrice: 14 }, budget: 9_500_000, morale: 64, attack: 64, midfield: 64, defense: 64 },
+  { id: 'ceu', name: 'AD Ceuta FC', crestUrl: 'https://icons.duckduckgo.com/ip3/adceutafc.com.ico', stadium: { name: 'Alfonso Murube', capacity: 6_500, ticketPrice: 13 }, budget: 8_000_000, morale: 63, attack: 63, midfield: 63, defense: 63 },
+  { id: 'ibi', name: 'UD Ibiza', crestUrl: 'https://icons.duckduckgo.com/ip3/udibiza.com.ico', stadium: { name: 'Can Misses', capacity: 6_445, ticketPrice: 13 }, budget: 8_500_000, morale: 63, attack: 63, midfield: 64, defense: 63 },
+  { id: 'rec', name: 'Recreativo Huelva', crestUrl: 'https://icons.duckduckgo.com/ip3/recreativohuelva.com.ico', stadium: { name: 'Nuevo Colombino', capacity: 21_670, ticketPrice: 14 }, budget: 9_000_000, morale: 64, attack: 64, midfield: 64, defense: 64 },
+  { id: 'log', name: 'SD Logrones', crestUrl: 'https://icons.duckduckgo.com/ip3/sdlogrones.com.ico', stadium: { name: 'Las Gaunas', capacity: 16_000, ticketPrice: 13 }, budget: 8_500_000, morale: 63, attack: 63, midfield: 63, defense: 63 },
+  { id: 'uni', name: 'Unionistas de Salamanca', crestUrl: 'https://icons.duckduckgo.com/ip3/unionistascf.com.ico', stadium: { name: 'Reina Sofia', capacity: 4_895, ticketPrice: 12 }, budget: 8_000_000, morale: 63, attack: 63, midfield: 62, defense: 63 },
+  { id: 'alc', name: 'CD Alcoyano', crestUrl: 'https://icons.duckduckgo.com/ip3/cdalcoyano.com.ico', stadium: { name: 'El Collao', capacity: 4_850, ticketPrice: 12 }, budget: 7_500_000, morale: 62, attack: 62, midfield: 62, defense: 62 },
+  { id: 'fue', name: 'CF Fuenlabrada', crestUrl: 'https://icons.duckduckgo.com/ip3/cffuenlabrada.es.ico', stadium: { name: 'Fernando Torres', capacity: 5_400, ticketPrice: 12 }, budget: 7_500_000, morale: 62, attack: 62, midfield: 62, defense: 62 },
+  { id: 'rmc', name: 'Real Madrid Castilla', crestUrl: 'https://icons.duckduckgo.com/ip3/realmadrid.com.ico', stadium: { name: 'Alfredo Di Stefano', capacity: 6_000, ticketPrice: 12 }, budget: 8_000_000, morale: 64, attack: 64, midfield: 63, defense: 63 },
+  { id: 'sva', name: 'Sevilla Atletico', crestUrl: 'https://icons.duckduckgo.com/ip3/sevillafc.es.ico', stadium: { name: 'Jesus Navas', capacity: 7_500, ticketPrice: 12 }, budget: 8_000_000, morale: 63, attack: 63, midfield: 63, defense: 63 },
+  { id: 'celb', name: 'Celta Fortuna', crestUrl: 'https://icons.duckduckgo.com/ip3/rccelta.es.ico', stadium: { name: 'Balaidos Anexo', capacity: 3_000, ticketPrice: 11 }, budget: 7_000_000, morale: 62, attack: 62, midfield: 62, defense: 62 },
+  { id: 'rsob', name: 'Real Sociedad B', crestUrl: 'https://icons.duckduckgo.com/ip3/realsociedad.eus.ico', stadium: { name: 'Zubieta', capacity: 2_500, ticketPrice: 11 }, budget: 7_000_000, morale: 62, attack: 62, midfield: 62, defense: 62 },
+  { id: 'bab', name: 'Barcelona Atletic', crestUrl: 'https://icons.duckduckgo.com/ip3/fcbarcelona.com.ico', stadium: { name: 'Johan Cruyff', capacity: 6_000, ticketPrice: 12 }, budget: 7_500_000, morale: 63, attack: 63, midfield: 63, defense: 62 },
+  { id: 'atb', name: 'Atletico Baleares', crestUrl: 'https://icons.duckduckgo.com/ip3/atleticobaleares.com.ico', stadium: { name: 'Estadi Balear', capacity: 6_000, ticketPrice: 11 }, budget: 7_000_000, morale: 62, attack: 62, midfield: 62, defense: 62 },
+  { id: 'zam', name: 'Zamora CF', crestUrl: 'https://icons.duckduckgo.com/ip3/zamoracf.es.ico', stadium: { name: 'Ruta de la Plata', capacity: 7_813, ticketPrice: 11 }, budget: 7_000_000, morale: 61, attack: 61, midfield: 61, defense: 62 },
+  { id: 'arr', name: 'CD Arenteiro', crestUrl: 'https://icons.duckduckgo.com/ip3/cdarenteiro.es.ico', stadium: { name: 'Espinedo', capacity: 4_000, ticketPrice: 10 }, budget: 6_500_000, morale: 61, attack: 61, midfield: 61, defense: 61 },
+  { id: 'lin', name: 'Linares Deportivo', crestUrl: 'https://icons.duckduckgo.com/ip3/linaresdeportivo.es.ico', stadium: { name: 'Linarejos', capacity: 10_000, ticketPrice: 11 }, budget: 6_800_000, morale: 61, attack: 61, midfield: 61, defense: 61 },
+  { id: 'anc', name: 'Antequera CF', crestUrl: 'https://icons.duckduckgo.com/ip3/antequeracf.es.ico', stadium: { name: 'El Mauli', capacity: 4_500, ticketPrice: 10 }, budget: 6_500_000, morale: 61, attack: 61, midfield: 61, defense: 61 },
+]
+
+const primeraFederacionGroupTwoTeams: TeamSeed[] = [
+  { id: 'alg', name: 'Algeciras CF', crestUrl: 'https://icons.duckduckgo.com/ip3/algecirascf.eu.ico', stadium: { name: 'Nuevo Mirador', capacity: 7_800, ticketPrice: 11 }, budget: 6_800_000, morale: 61, attack: 61, midfield: 61, defense: 61 },
+  { id: 'san', name: 'Atletico Sanluqueno', crestUrl: 'https://icons.duckduckgo.com/ip3/atleticosanluqueno.com.ico', stadium: { name: 'El Palmar', capacity: 5_000, ticketPrice: 10 }, budget: 6_400_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'betb', name: 'Betis Deportivo', crestUrl: 'https://icons.duckduckgo.com/ip3/realbetisbalompie.es.ico', stadium: { name: 'Luis del Sol', capacity: 3_500, ticketPrice: 10 }, budget: 6_900_000, morale: 61, attack: 61, midfield: 61, defense: 60 },
+  { id: 'her', name: 'Hercules CF', crestUrl: 'https://icons.duckduckgo.com/ip3/herculesdealicantecf.net.ico', stadium: { name: 'Jose Rico Perez', capacity: 29_500, ticketPrice: 12 }, budget: 7_500_000, morale: 62, attack: 62, midfield: 62, defense: 62 },
+  { id: 'int', name: 'CF Intercity', crestUrl: 'https://icons.duckduckgo.com/ip3/cfintercity.com.ico', stadium: { name: 'Antonio Solana', capacity: 4_000, ticketPrice: 10 }, budget: 6_500_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'mer', name: 'Merida AD', crestUrl: 'https://icons.duckduckgo.com/ip3/meridaad.com.ico', stadium: { name: 'Romano', capacity: 14_600, ticketPrice: 11 }, budget: 6_900_000, morale: 61, attack: 61, midfield: 61, defense: 61 },
+  { id: 'osab', name: 'Osasuna Promesas', crestUrl: 'https://icons.duckduckgo.com/ip3/osasuna.es.ico', stadium: { name: 'Tajonar', capacity: 4_000, ticketPrice: 10 }, budget: 6_700_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'our', name: 'Ourense CF', crestUrl: 'https://icons.duckduckgo.com/ip3/ourensecf.es.ico', stadium: { name: 'O Couto', capacity: 5_659, ticketPrice: 10 }, budget: 6_300_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'tar', name: 'SD Tarazona', crestUrl: 'https://icons.duckduckgo.com/ip3/sdtarazona.com.ico', stadium: { name: 'Municipal de Tarazona', capacity: 2_500, ticketPrice: 9 }, budget: 6_000_000, morale: 59, attack: 59, midfield: 59, defense: 59 },
+  { id: 'seg', name: 'Gimnastica Segoviana', crestUrl: 'https://icons.duckduckgo.com/ip3/gimnasticasegoviana.es.ico', stadium: { name: 'La Albuera', capacity: 6_000, ticketPrice: 9 }, budget: 6_000_000, morale: 59, attack: 59, midfield: 59, defense: 59 },
+  { id: 'ses', name: 'Sestao River', crestUrl: 'https://icons.duckduckgo.com/ip3/sestaoriverclub.com.ico', stadium: { name: 'Las Llanas', capacity: 8_900, ticketPrice: 10 }, budget: 6_200_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'bark', name: 'Barakaldo CF', crestUrl: 'https://icons.duckduckgo.com/ip3/barakaldocf.com.ico', stadium: { name: 'Lasesarre', capacity: 7_960, ticketPrice: 10 }, budget: 6_200_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'bilb', name: 'Bilbao Athletic', crestUrl: 'https://icons.duckduckgo.com/ip3/athletic-club.eus.ico', stadium: { name: 'Lezama', capacity: 3_250, ticketPrice: 10 }, budget: 6_800_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'vilb', name: 'Villarreal B', crestUrl: 'https://icons.duckduckgo.com/ip3/villarrealcf.es.ico', stadium: { name: 'Ciudad Deportiva Villarreal', capacity: 3_000, ticketPrice: 10 }, budget: 6_800_000, morale: 60, attack: 61, midfield: 60, defense: 60 },
+  { id: 'mar', name: 'Marbella FC', crestUrl: 'https://icons.duckduckgo.com/ip3/marbellafc.es.ico', stadium: { name: 'Dama de Noche', capacity: 7_300, ticketPrice: 10 }, budget: 6_300_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'ponb', name: 'Pontevedra CF', crestUrl: 'https://icons.duckduckgo.com/ip3/pontevedracf.com.ico', stadium: { name: 'Pasaron', capacity: 10_500, ticketPrice: 10 }, budget: 6_400_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'cor', name: 'Cordoba CF', crestUrl: 'https://icons.duckduckgo.com/ip3/cordobacf.com.ico', stadium: { name: 'Nuevo Arcangel', capacity: 21_822, ticketPrice: 12 }, budget: 7_500_000, morale: 62, attack: 62, midfield: 62, defense: 61 },
+  { id: 'casc', name: 'Cacereno', crestUrl: 'https://icons.duckduckgo.com/ip3/cpcacereno.com.ico', stadium: { name: 'Principe Felipe', capacity: 7_000, ticketPrice: 10 }, budget: 6_000_000, morale: 59, attack: 59, midfield: 59, defense: 59 },
+  { id: 'sabd', name: 'CE Sabadell', crestUrl: 'https://icons.duckduckgo.com/ip3/cesabadell.cat.ico', stadium: { name: 'Nova Creu Alta', capacity: 11_908, ticketPrice: 10 }, budget: 6_700_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+  { id: 'num', name: 'CD Numancia', crestUrl: 'https://icons.duckduckgo.com/ip3/cdnumancia.com.ico', stadium: { name: 'Los Pajaritos', capacity: 8_261, ticketPrice: 10 }, budget: 6_800_000, morale: 60, attack: 60, midfield: 60, defense: 60 },
+]
+
 const trainingFocusCycle: TrainingFocus[] = ['fitness', 'attack', 'midfield', 'defense']
 const tacticCycle: Tactic[] = ['4-3-3', '4-4-2', '5-4-1']
 
@@ -288,6 +362,94 @@ const sponsors = [
   'Seguros Brio',
   'MetalSur',
 ]
+
+const lowerDivisionFallbackRealNames = [
+  'Sergio Asenjo', 'Alvaro Fernandez', 'Ruben Yanez', 'Diego Altube', 'Luca Romero', 'Javi Puado',
+  'Sergio Camello', 'Miguel de la Fuente', 'Juan Villar', 'Juan Narvaez', 'Ivan Jaime', 'Jorge de Frutos',
+  'Manu Morlanes', 'Victor Mollejo', 'Borja Garces', 'Mamadou Sylla', 'Cristo Gonzalez', 'Marc Gual',
+  'Jon Bautista', 'Jose Corpas', 'Rober Pier', 'Eneko Jauregi', 'Aitor Ruibal', 'Alex Fores',
+  'Ruben Pardo', 'Oscar Plano', 'Alexandru Pascanu', 'Josep Sene', 'Sergio Ruiz Alonso', 'Dani Escriche',
+  'Pablo Martinez', 'Miguel Atienza', 'Aleix Febas', 'Joni Montiel', 'Aitor Sanz', 'Cris Montes',
+  'Lander Olaetxea', 'Fran Sol', 'Juan Carlos Arana', 'Sergio Carreira', 'Carlos Isaac', 'Miguel Baeza',
+  'Yanis Rahmani', 'Jonathan Dubasin', 'Jose Carlos Lazo', 'Edu Exposito', 'Riki Rodriguez', 'Nico Serrano',
+  'Ilyas Chaira', 'Kevin Medina', 'Naim Garcia', 'Alberto Quiles', 'Borja Valle', 'Mikel Rico',
+  'Salva Ruiz', 'Carlos Pomares', 'Carlos Doncel', 'Javi Lara', 'Samu Saiz', 'Javi Munoz',
+  'Alberto Escassi', 'Fede Vico', 'Rafa Mir', 'Juanmi Callejon', 'Sergio Bermejo', 'Sebas Moyano',
+  'Moi Delgado', 'Toni Moya', 'Mikel Iribas', 'Borja Sanchez', 'Alvaro Pena', 'Xabi Irureta',
+  'Jose Naranjo', 'Javier Aviles', 'David Costas', 'Diego Gonzalez', 'Alex Petxa', 'Andoni Lopez',
+  'Unai Medina', 'Saul Garcia', 'Victor Campuzano', 'Pablo Claveria', 'Jorge Pombo', 'Dani Romera',
+  'Jordi Mboula', 'Sergio Castel', 'Sergi Guardiola', 'Carlos Cordero', 'Jose Gragera', 'Javi Ros',
+  'Mikel Balenziaga', 'Luis Rioja', 'Kike Perez', 'Fran Villalba', 'Miki Munoz', 'Cristian Herrera',
+  'David Rodriguez', 'Jose Arnaiz', 'Lluis Lopez', 'Marc Cardona', 'Jaume Grau', 'Pablo Hervias',
+  'Alvaro Jimenez', 'Javi Martos', 'Miguel Loureiro', 'Ander Cantero', 'Alex Martin',
+  'Joaquin Munoz', 'Gaizka Larrazabal', 'Iker Undabarrena',
+]
+
+const segundaRegionalGroups: Record<string, CompetitionGroup> = {
+  lev: 'Grupo 2',
+  eib: 'Grupo 1',
+  ten: 'Grupo 2',
+  zar: 'Grupo 1',
+  ovi: 'Grupo 1',
+  spo: 'Grupo 1',
+  rac: 'Grupo 1',
+  alb: 'Grupo 2',
+  bur: 'Grupo 1',
+  car: 'Grupo 2',
+  mir: 'Grupo 1',
+  dep: 'Grupo 1',
+  hue: 'Grupo 1',
+  and: 'Grupo 2',
+  pon: 'Grupo 1',
+  lug: 'Grupo 1',
+  cas: 'Grupo 2',
+  fer: 'Grupo 1',
+  eld: 'Grupo 2',
+  leg: 'Grupo 2',
+}
+
+const primeraFederacionRegionalGroups: Record<string, CompetitionGroup> = {
+  cul: 'Grupo 1',
+  mur: 'Grupo 1',
+  nat: 'Grupo 1',
+  ceu: 'Grupo 1',
+  ibi: 'Grupo 1',
+  rec: 'Grupo 1',
+  log: 'Grupo 1',
+  uni: 'Grupo 1',
+  alc: 'Grupo 1',
+  fue: 'Grupo 1',
+  rmc: 'Grupo 1',
+  sva: 'Grupo 1',
+  celb: 'Grupo 1',
+  rsob: 'Grupo 1',
+  bab: 'Grupo 1',
+  atb: 'Grupo 1',
+  zam: 'Grupo 1',
+  arr: 'Grupo 1',
+  lin: 'Grupo 1',
+  anc: 'Grupo 1',
+  alg: 'Grupo 2',
+  san: 'Grupo 2',
+  betb: 'Grupo 2',
+  her: 'Grupo 2',
+  int: 'Grupo 2',
+  mer: 'Grupo 2',
+  osab: 'Grupo 2',
+  our: 'Grupo 2',
+  tar: 'Grupo 2',
+  seg: 'Grupo 2',
+  ses: 'Grupo 2',
+  bark: 'Grupo 2',
+  bilb: 'Grupo 2',
+  vilb: 'Grupo 2',
+  mar: 'Grupo 2',
+  ponb: 'Grupo 2',
+  cor: 'Grupo 2',
+  casc: 'Grupo 2',
+  sabd: 'Grupo 2',
+  num: 'Grupo 2',
+}
 
 const squadShape = [
   'GK',
@@ -791,6 +953,564 @@ const teamRosters: Record<string, RosterEntry[]> = {
     { name: 'Shon Weissman', position: 'FWD' },
     { name: 'Matias Arezo', position: 'FWD' },
   ],
+  lev: [
+    { name: 'Andres Fernandez', position: 'GK' },
+    { name: 'Ruben Vezo', position: 'DEF' },
+    { name: 'Sergio Postigo', position: 'DEF' },
+    { name: 'Alex Valle', position: 'DEF' },
+    { name: 'Oriol Rey', position: 'MID' },
+    { name: 'Giorgi Kochorashvili', position: 'MID' },
+    { name: 'Carlos Alvarez', position: 'MID' },
+    { name: 'Mohamed Bouldini', position: 'FWD' },
+  ],
+  eib: [
+    { name: 'Luca Zidane', position: 'GK' },
+    { name: 'Anaitz Arbilla', position: 'DEF' },
+    { name: 'Alvaro Tejero', position: 'DEF' },
+    { name: 'Frederico Venancio', position: 'DEF' },
+    { name: 'Peru Nolaskoain', position: 'MID' },
+    { name: 'Ager Aketxe', position: 'MID' },
+    { name: 'Matheus Pereira', position: 'MID' },
+    { name: 'Stoichkov', position: 'FWD' },
+  ],
+  ten: [
+    { name: 'Juan Soriano', position: 'GK' },
+    { name: 'Jose Leon', position: 'DEF' },
+    { name: 'Nacho Martinez', position: 'DEF' },
+    { name: 'Aitor Bunuel', position: 'DEF' },
+    { name: 'Aitor Sanz', position: 'MID' },
+    { name: 'Roberto Lopez', position: 'MID' },
+    { name: 'Waldo Rubio', position: 'MID' },
+    { name: 'Enric Gallego', position: 'FWD' },
+  ],
+  zar: [
+    { name: 'Cristian Alvarez', position: 'GK' },
+    { name: 'Jair Amador', position: 'DEF' },
+    { name: 'Alejandro Frances', position: 'DEF' },
+    { name: 'Carlos Nieto', position: 'DEF' },
+    { name: 'Francho Serrano', position: 'MID' },
+    { name: 'Maikel Mesa', position: 'MID' },
+    { name: 'German Valera', position: 'MID' },
+    { name: 'Ivan Azon', position: 'FWD' },
+  ],
+  ovi: [
+    { name: 'Leo Roman', position: 'GK' },
+    { name: 'Dani Calvo', position: 'DEF' },
+    { name: 'Oier Luengo', position: 'DEF' },
+    { name: 'Abel Bretones', position: 'DEF' },
+    { name: 'Santi Cazorla', position: 'MID' },
+    { name: 'Santiago Colombatto', position: 'MID' },
+    { name: 'Luismi', position: 'MID' },
+    { name: 'Borja Baston', position: 'FWD' },
+  ],
+  spo: [
+    { name: 'Diego Marino', position: 'GK' },
+    { name: 'Pablo Insua', position: 'DEF' },
+    { name: 'Cote', position: 'DEF' },
+    { name: 'Guille Rosas', position: 'DEF' },
+    { name: 'Nacho Mendez', position: 'MID' },
+    { name: 'Roque Mesa', position: 'MID' },
+    { name: 'Gaspar Campos', position: 'MID' },
+    { name: 'Uros Djurdjevic', position: 'FWD' },
+  ],
+  rac: [
+    { name: 'Jokin Ezkieta', position: 'GK' },
+    { name: 'German Sanchez', position: 'DEF' },
+    { name: 'Ruben Alves', position: 'DEF' },
+    { name: 'Dani Fernandez', position: 'DEF' },
+    { name: 'Inigo Vicente', position: 'MID' },
+    { name: 'Aritz Aldasoro', position: 'MID' },
+    { name: 'Vicente', position: 'MID' },
+    { name: 'Peque', position: 'FWD' },
+  ],
+  alb: [
+    { name: 'Bernabe Barragan', position: 'GK' },
+    { name: 'Djetei', position: 'DEF' },
+    { name: 'Lalo Aguilar', position: 'DEF' },
+    { name: 'Julio Alonso', position: 'DEF' },
+    { name: 'Riki Rodriguez', position: 'MID' },
+    { name: 'Manu Fuster', position: 'MID' },
+    { name: 'Fidel Chaves', position: 'MID' },
+    { name: 'Higinio Marin', position: 'FWD' },
+  ],
+  bur: [
+    { name: 'Jose Antonio Caro', position: 'GK' },
+    { name: 'Aitor Cordoba', position: 'DEF' },
+    { name: 'Grego Sierra', position: 'DEF' },
+    { name: 'Matos', position: 'DEF' },
+    { name: 'Mumo', position: 'MID' },
+    { name: 'Curro Sanchez', position: 'MID' },
+    { name: 'Alex Bermejo', position: 'MID' },
+    { name: 'Edu Espiau', position: 'FWD' },
+  ],
+  car: [
+    { name: 'Marc Martinez', position: 'GK' },
+    { name: 'Pedro Alcala', position: 'DEF' },
+    { name: 'Kiko Olivas', position: 'DEF' },
+    { name: 'Ivan Calero', position: 'DEF' },
+    { name: 'Luis Munoz', position: 'MID' },
+    { name: 'Andy Rodriguez', position: 'MID' },
+    { name: 'Jony Alamo', position: 'MID' },
+    { name: 'Alfredo Ortuno', position: 'FWD' },
+  ],
+  mir: [
+    { name: 'Ramon Juan', position: 'GK' },
+    { name: 'Sergio Barcia', position: 'DEF' },
+    { name: 'Juan Gutierrez', position: 'DEF' },
+    { name: 'Pablo Tomeo', position: 'DEF' },
+    { name: 'Alvaro Sanz', position: 'MID' },
+    { name: 'Alberto Reina', position: 'MID' },
+    { name: 'Carlos Martin', position: 'MID' },
+    { name: 'Javier Marton', position: 'FWD' },
+  ],
+  dep: [
+    { name: 'German Parreno', position: 'GK' },
+    { name: 'Pablo Vazquez', position: 'DEF' },
+    { name: 'Jaime Sanchez', position: 'DEF' },
+    { name: 'Ximo Navarro', position: 'DEF' },
+    { name: 'Jose Angel Jurado', position: 'MID' },
+    { name: 'David Mella', position: 'MID' },
+    { name: 'Yeremay Hernandez', position: 'MID' },
+    { name: 'Lucas Perez', position: 'FWD' },
+  ],
+  hue: [
+    { name: 'Alvaro Fernandez', position: 'GK' },
+    { name: 'Jorge Pulido', position: 'DEF' },
+    { name: 'Jeremy Blasco', position: 'DEF' },
+    { name: 'Miguel Loureiro', position: 'DEF' },
+    { name: 'Javi Martinez', position: 'MID' },
+    { name: 'Kento Hashimoto', position: 'MID' },
+    { name: 'Sergi Enrich', position: 'FWD' },
+    { name: 'Joaquin Munoz', position: 'FWD' },
+  ],
+  and: [
+    { name: 'Nicolas Ratti', position: 'GK' },
+    { name: 'Alex Pastor', position: 'DEF' },
+    { name: 'Diego Alende', position: 'DEF' },
+    { name: 'Marti Vila', position: 'DEF' },
+    { name: 'Sergi Samper', position: 'MID' },
+    { name: 'Ivan Gil', position: 'MID' },
+    { name: 'Julen Lobete', position: 'FWD' },
+    { name: 'Manu Nieto', position: 'FWD' },
+  ],
+  pon: [
+    { name: 'Andres Prieto', position: 'GK' },
+    { name: 'Jose Amo', position: 'DEF' },
+    { name: 'Alex Costa', position: 'DEF' },
+    { name: 'Sibille', position: 'DEF' },
+    { name: 'Naim Garcia', position: 'MID' },
+    { name: 'Moises Delgado', position: 'MID' },
+    { name: 'Yeray Cabanzon', position: 'MID' },
+    { name: 'Eneko Jauregi', position: 'FWD' },
+  ],
+  lug: [
+    { name: 'Oscar Whalley', position: 'GK' },
+    { name: 'Miguel Loureiro', position: 'DEF' },
+    { name: 'Alberto Rodriguez', position: 'DEF' },
+    { name: 'Zé Ricardo', position: 'DEF' },
+    { name: 'Juanpe', position: 'MID' },
+    { name: 'Claveria', position: 'MID' },
+    { name: 'Chris Ramos', position: 'FWD' },
+    { name: 'Manu Barreiro', position: 'FWD' },
+  ],
+  cas: [
+    { name: 'Gonzalo Crettaz', position: 'GK' },
+    { name: 'Alberto Jimenez', position: 'DEF' },
+    { name: 'Jetro Willems', position: 'DEF' },
+    { name: 'Sergio Moyita', position: 'MID' },
+    { name: 'Calavera', position: 'MID' },
+    { name: 'Israel Suero', position: 'MID' },
+    { name: 'Raul Sanchez', position: 'FWD' },
+    { name: 'De Miguel', position: 'FWD' },
+  ],
+  fer: [
+    { name: 'Jesus Ruiz', position: 'GK' },
+    { name: 'David Castro', position: 'DEF' },
+    { name: 'Jon Garcia', position: 'DEF' },
+    { name: 'Brais Martinez', position: 'DEF' },
+    { name: 'Josep Sene', position: 'MID' },
+    { name: 'Heber Pena', position: 'MID' },
+    { name: 'Carlos Vicente', position: 'MID' },
+    { name: 'Manu Justo', position: 'FWD' },
+  ],
+  eld: [
+    { name: 'Marc Mateu', position: 'DEF' },
+    { name: 'Ian Mackay', position: 'GK' },
+    { name: 'Dario Dumic', position: 'DEF' },
+    { name: 'Toni Abad', position: 'DEF' },
+    { name: 'Sergio Ortuno', position: 'MID' },
+    { name: 'David Timor', position: 'MID' },
+    { name: 'Juanto Ortuno', position: 'FWD' },
+    { name: 'Mario Soberon', position: 'FWD' },
+  ],
+  leg: [
+    { name: 'Diego Conde', position: 'GK' },
+    { name: 'Sergio Gonzalez', position: 'DEF' },
+    { name: 'Jorge Saenz', position: 'DEF' },
+    { name: 'Enric Franquesa', position: 'DEF' },
+    { name: 'Undabarrena', position: 'MID' },
+    { name: 'Portillo', position: 'MID' },
+    { name: 'Naim Garcia', position: 'MID' },
+    { name: 'Miguel de la Fuente', position: 'FWD' },
+  ],
+  cul: [
+    { name: 'Miguel Banez', position: 'GK' },
+    { name: 'Victor Garcia', position: 'DEF' },
+    { name: 'Rodolfo Bodipo', position: 'DEF' },
+    { name: 'Kevin Presa', position: 'MID' },
+    { name: 'Jesus Alvarez', position: 'MID' },
+    { name: 'Alvaro Martinez', position: 'MID' },
+    { name: 'Guillermo Fernandez', position: 'FWD' },
+    { name: 'Dani Vidal', position: 'FWD' },
+  ],
+  mur: [
+    { name: 'Gazzaniga', position: 'GK' },
+    { name: 'Alberto Gonzalez', position: 'DEF' },
+    { name: 'Jose Ruiz', position: 'DEF' },
+    { name: 'Isi Ros', position: 'MID' },
+    { name: 'Pedro Leon', position: 'MID' },
+    { name: 'Dani Vega', position: 'MID' },
+    { name: 'Carrillo', position: 'FWD' },
+    { name: 'Javier Rueda', position: 'FWD' },
+  ],
+  nat: [
+    { name: 'Dani Parra', position: 'GK' },
+    { name: 'Nacho Gonzalez', position: 'DEF' },
+    { name: 'Pablo Trigueros', position: 'DEF' },
+    { name: 'Joan Oriol', position: 'DEF' },
+    { name: 'Marc Montalvo', position: 'MID' },
+    { name: 'Borja Martinez', position: 'MID' },
+    { name: 'Pol Domingo', position: 'MID' },
+    { name: 'Pablo Fernandez', position: 'FWD' },
+  ],
+  ceu: [
+    { name: 'Pedro Lopez', position: 'GK' },
+    { name: 'Capa', position: 'DEF' },
+    { name: 'Carlos Redru', position: 'DEF' },
+    { name: 'Aisar Ahmed', position: 'DEF' },
+    { name: 'Rodri Rios', position: 'MID' },
+    { name: 'Jota', position: 'MID' },
+    { name: 'Alain Oyarzun', position: 'MID' },
+    { name: 'Youness Lachhab', position: 'FWD' },
+  ],
+  ibi: [
+    { name: 'German', position: 'GK' },
+    { name: 'Molina', position: 'DEF' },
+    { name: 'Escassi', position: 'DEF' },
+    { name: 'Javi Vazquez', position: 'DEF' },
+    { name: 'Javi Perez', position: 'MID' },
+    { name: 'Miki Villar', position: 'MID' },
+    { name: 'Nolito', position: 'MID' },
+    { name: 'Sergi Enrich', position: 'FWD' },
+  ],
+  rec: [
+    { name: 'Ruben Galvez', position: 'GK' },
+    { name: 'Carlos Beitia', position: 'DEF' },
+    { name: 'Juanjo Mateo', position: 'DEF' },
+    { name: 'Pablo Caballero', position: 'DEF' },
+    { name: 'Sergio Jimenez', position: 'MID' },
+    { name: 'De la Rosa', position: 'MID' },
+    { name: 'David del Pozo', position: 'MID' },
+    { name: 'Caye Quintana', position: 'FWD' },
+  ],
+  log: [
+    { name: 'Pichu Atienza', position: 'GK' },
+    { name: 'Aridane', position: 'DEF' },
+    { name: 'Iago Lopez', position: 'DEF' },
+    { name: 'Markel Lozano', position: 'MID' },
+    { name: 'Sergio Benito', position: 'MID' },
+    { name: 'Dioni', position: 'MID' },
+    { name: 'Clau Mendes', position: 'FWD' },
+    { name: 'Jony Niguez', position: 'FWD' },
+  ],
+  uni: [
+    { name: 'Ivan Martinez', position: 'GK' },
+    { name: 'Rastrojo', position: 'DEF' },
+    { name: 'Ramiro Mayor', position: 'DEF' },
+    { name: 'Mikel Serrano', position: 'MID' },
+    { name: 'Aitor Pascual', position: 'MID' },
+    { name: 'Pablo Espina', position: 'MID' },
+    { name: 'Alfred Planas', position: 'FWD' },
+    { name: 'Diego Garcia', position: 'FWD' },
+  ],
+  alc: [
+    { name: 'Miguel Bañuz', position: 'GK' },
+    { name: 'Primi', position: 'DEF' },
+    { name: 'Mario Fuentes', position: 'DEF' },
+    { name: 'Imanol Garcia', position: 'MID' },
+    { name: 'Lobato', position: 'MID' },
+    { name: 'Agus Medina', position: 'MID' },
+    { name: 'Raul Alcaina', position: 'FWD' },
+    { name: 'Juanan Casanova', position: 'FWD' },
+  ],
+  fue: [
+    { name: 'Belman', position: 'GK' },
+    { name: 'Sotillos', position: 'DEF' },
+    { name: 'Pol Valentín', position: 'DEF' },
+    { name: 'Cristo Diaz', position: 'MID' },
+    { name: 'Fer Ruiz', position: 'MID' },
+    { name: 'Kevin Bua', position: 'MID' },
+    { name: 'Cedric Omoigui', position: 'FWD' },
+    { name: 'Juanma Marrero', position: 'FWD' },
+  ],
+  rmc: [
+    { name: 'Lucas Canizares', position: 'GK' },
+    { name: 'Marvel', position: 'DEF' },
+    { name: 'Edgar Pujol', position: 'DEF' },
+    { name: 'Rafael Obrador', position: 'DEF' },
+    { name: 'Theo Zidane', position: 'MID' },
+    { name: 'Nico Paz', position: 'MID' },
+    { name: 'Cesar Palacios', position: 'MID' },
+    { name: 'Alvaro Rodriguez', position: 'FWD' },
+  ],
+  sva: [
+    { name: 'Alberto Flores', position: 'GK' },
+    { name: 'Kike Salas', position: 'DEF' },
+    { name: 'Darío Benavides', position: 'DEF' },
+    { name: 'Juanlu Sanchez', position: 'DEF' },
+    { name: 'Lulo Dasilva', position: 'MID' },
+    { name: 'Manu Bueno', position: 'MID' },
+    { name: 'Diego Hormigo', position: 'MID' },
+    { name: 'Isaac Romero', position: 'FWD' },
+  ],
+  alg: [
+    { name: 'Lucho Garcia', position: 'GK' },
+    { name: 'Tomás Sanchez', position: 'DEF' },
+    { name: 'Mario Gomez', position: 'DEF' },
+    { name: 'Javier Aviles', position: 'MID' },
+    { name: 'Marino Illescas', position: 'MID' },
+    { name: 'Ivan Turrillo', position: 'MID' },
+    { name: 'Ruben Serrano', position: 'DEF' },
+    { name: 'Roko Baturina', position: 'FWD' },
+  ],
+  san: [
+    { name: 'Samu Casado', position: 'GK' },
+    { name: 'Antonito', position: 'DEF' },
+    { name: 'Fran Gongora', position: 'DEF' },
+    { name: 'Sergio Noche', position: 'MID' },
+    { name: 'Alex Gorrin', position: 'MID' },
+    { name: 'Mawi', position: 'MID' },
+    { name: 'Juanmi Carrión', position: 'DEF' },
+    { name: 'Airam Cabrera', position: 'FWD' },
+  ],
+  betb: [
+    { name: 'Guilherme Fernandes', position: 'GK' },
+    { name: 'Sergi Altimira', position: 'MID' },
+    { name: 'Assane Diao', position: 'FWD' },
+    { name: 'Pablo Busto', position: 'DEF' },
+    { name: 'Xavi Pleguezuelo', position: 'DEF' },
+    { name: 'Marchena', position: 'MID' },
+    { name: 'Félix Garreta', position: 'DEF' },
+    { name: 'Marcos Fernández', position: 'FWD' },
+  ],
+  her: [
+    { name: 'Carlos Abad', position: 'GK' },
+    { name: 'Josema Gomez', position: 'DEF' },
+    { name: 'Samu Vázquez', position: 'DEF' },
+    { name: 'Míchel Herrero', position: 'MID' },
+    { name: 'Nico Espinosa', position: 'MID' },
+    { name: 'Alvarito', position: 'MID' },
+    { name: 'Jean Paul', position: 'DEF' },
+    { name: 'Coscia', position: 'FWD' },
+  ],
+  int: [
+    { name: 'Gaizka Campos', position: 'GK' },
+    { name: 'Emilio Nsue', position: 'DEF' },
+    { name: 'Ander Vitoria', position: 'FWD' },
+    { name: 'Cristo Romero', position: 'DEF' },
+    { name: 'Julio Gracia', position: 'MID' },
+    { name: 'Pol Roige', position: 'MID' },
+    { name: 'Miki Muñoz', position: 'MID' },
+    { name: 'Locadia', position: 'FWD' },
+  ],
+  mer: [
+    { name: 'Juanpa', position: 'GK' },
+    { name: 'Bonaque', position: 'DEF' },
+    { name: 'Eslava', position: 'DEF' },
+    { name: 'Carlos Doncel', position: 'MID' },
+    { name: 'Álvaro Ramón', position: 'MID' },
+    { name: 'David Rocha', position: 'MID' },
+    { name: 'Pipe', position: 'DEF' },
+    { name: 'Chuma', position: 'FWD' },
+  ],
+  osab: [
+    { name: 'Stamatakis', position: 'GK' },
+    { name: 'Jorge Herrando', position: 'DEF' },
+    { name: 'Sixtus Ogbuehi', position: 'FWD' },
+    { name: 'Diego Moreno', position: 'DEF' },
+    { name: 'Iker Benito', position: 'MID' },
+    { name: 'Mauro Echegoyen', position: 'MID' },
+    { name: 'Aimar Oroz', position: 'MID' },
+    { name: 'Asier Osambela', position: 'MID' },
+  ],
+  our: [
+    { name: 'Marqueta', position: 'GK' },
+    { name: 'Jairo Noriega', position: 'DEF' },
+    { name: 'Álex Fernández', position: 'DEF' },
+    { name: 'Luismi', position: 'MID' },
+    { name: 'Jorge Álvarez', position: 'MID' },
+    { name: 'Ángel Sánchez', position: 'MID' },
+    { name: 'Aarón Rey', position: 'MID' },
+    { name: 'Jerin Ramos', position: 'FWD' },
+  ],
+  tar: [
+    { name: 'Fuoli', position: 'GK' },
+    { name: 'David Cubillas', position: 'FWD' },
+    { name: 'Mendoza', position: 'DEF' },
+    { name: 'Álex Gil', position: 'MID' },
+    { name: 'Adrián Fuentes', position: 'MID' },
+    { name: 'Toni Gabarre', position: 'FWD' },
+    { name: 'Chechu Martínez', position: 'DEF' },
+    { name: 'Dani González', position: 'MID' },
+  ],
+  seg: [
+    { name: 'Carmona', position: 'GK' },
+    { name: 'Mansour', position: 'DEF' },
+    { name: 'Pascu', position: 'DEF' },
+    { name: 'Diego Gómez', position: 'MID' },
+    { name: 'Javi Borrego', position: 'MID' },
+    { name: 'Llorente', position: 'MID' },
+    { name: 'Farru', position: 'DEF' },
+    { name: 'Dani Plomer', position: 'FWD' },
+  ],
+  ses: [
+    { name: 'Aitor Arregi', position: 'DEF' },
+    { name: 'Gaizka Martinez', position: 'MID' },
+    { name: 'Leandro Martinez', position: 'GK' },
+    { name: 'Jon Cabo', position: 'MID' },
+    { name: 'Unai Rementeria', position: 'DEF' },
+    { name: 'Diego Garai', position: 'MID' },
+    { name: 'Markel Etxeberria', position: 'DEF' },
+    { name: 'Raúl Hernández', position: 'FWD' },
+  ],
+  bark: [
+    { name: 'Unai Marino', position: 'GK' },
+    { name: 'Markel Lozano', position: 'MID' },
+    { name: 'Pablo Santiago', position: 'MID' },
+    { name: 'Aymane Jelbat', position: 'DEF' },
+    { name: 'Eneko Undabarrena', position: 'MID' },
+    { name: 'Iker Bilbao', position: 'DEF' },
+    { name: 'Neskes', position: 'MID' },
+    { name: 'Julen Huidobro', position: 'FWD' },
+  ],
+  bilb: [
+    { name: 'Mikel Santos', position: 'GK' },
+    { name: 'Aingeru Olabarrieta', position: 'MID' },
+    { name: 'Adu Ares', position: 'MID' },
+    { name: 'Hugo Rincon', position: 'DEF' },
+    { name: 'Unai Gomez', position: 'MID' },
+    { name: 'Ibon Sanchez', position: 'DEF' },
+    { name: 'Asier Hierro', position: 'DEF' },
+    { name: 'Izeta', position: 'FWD' },
+  ],
+  vilb: [
+    { name: 'Iker Alvarez', position: 'GK' },
+    { name: 'Mamadou Fall', position: 'DEF' },
+    { name: 'Pau Navarro', position: 'DEF' },
+    { name: 'Dani Tasende', position: 'DEF' },
+    { name: 'Carlo Adriano', position: 'MID' },
+    { name: 'Rodri Alonso', position: 'MID' },
+    { name: 'Jorge Pascual', position: 'FWD' },
+    { name: 'Alex Forés', position: 'FWD' },
+  ],
+  mar: [
+    { name: 'Dani Martín', position: 'GK' },
+    { name: 'Javi Duarte', position: 'DEF' },
+    { name: 'Marcos Olguin', position: 'DEF' },
+    { name: 'Dioni Villalba', position: 'FWD' },
+    { name: 'Aitor Puñal', position: 'MID' },
+    { name: 'Javier Añón', position: 'MID' },
+    { name: 'Genar Fornes', position: 'MID' },
+    { name: 'Yac Diori', position: 'FWD' },
+  ],
+  ponb: [
+    { name: 'Edu Sousa', position: 'GK' },
+    { name: 'Héctor Hernández', position: 'DEF' },
+    { name: 'Álex González', position: 'DEF' },
+    { name: 'Miguel Román', position: 'MID' },
+    { name: 'Charles Dias', position: 'FWD' },
+    { name: 'Rufo', position: 'FWD' },
+    { name: 'Samu Mayo', position: 'MID' },
+    { name: 'Yelko Pino', position: 'MID' },
+  ],
+  cor: [
+    { name: 'Carlos Marin', position: 'GK' },
+    { name: 'Jose Calderon', position: 'DEF' },
+    { name: 'Adrián Lapena', position: 'DEF' },
+    { name: 'Isma Ruiz', position: 'MID' },
+    { name: 'Theo Zidane', position: 'MID' },
+    { name: 'Kuki Zalazar', position: 'MID' },
+    { name: 'Antonio Casas', position: 'FWD' },
+    { name: 'Cristian Carracedo', position: 'FWD' },
+  ],
+  casc: [
+    { name: 'Bernabé', position: 'GK' },
+    { name: 'Álvaro Clausí', position: 'DEF' },
+    { name: 'Mansilla', position: 'MID' },
+    { name: 'Álex Jiménez', position: 'DEF' },
+    { name: 'David Grande', position: 'FWD' },
+    { name: 'Solano', position: 'FWD' },
+    { name: 'Rubén Solano', position: 'MID' },
+    { name: 'José Ramón', position: 'DEF' },
+  ],
+  sabd: [
+    { name: 'Mackay', position: 'GK' },
+    { name: 'Rubén Martínez', position: 'DEF' },
+    { name: 'Iago Indias', position: 'DEF' },
+    { name: 'Carles Salvador', position: 'MID' },
+    { name: 'Miguelete', position: 'MID' },
+    { name: 'David Astals', position: 'MID' },
+    { name: 'Pau Víctor', position: 'FWD' },
+    { name: 'Alfredo Pedraza', position: 'FWD' },
+  ],
+  num: [
+    { name: 'Gaizka Ayesa', position: 'GK' },
+    { name: 'Carlos González', position: 'DEF' },
+    { name: 'Míchel Zabaco', position: 'DEF' },
+    { name: 'Cotán', position: 'MID' },
+    { name: 'Jordi Tur', position: 'MID' },
+    { name: 'Javi Bonilla', position: 'DEF' },
+    { name: 'Rubén Mesa', position: 'FWD' },
+    { name: 'Dani Fernández', position: 'FWD' },
+  ],
+}
+
+const primeraFederacionRosterIds = new Set([
+  'cul', 'mur', 'nat', 'ceu', 'ibi', 'rec', 'log', 'uni', 'alc', 'fue',
+  'rmc', 'sva', 'celb', 'rsob', 'bab', 'atb', 'zam', 'arr', 'lin', 'anc',
+  'alg', 'san', 'betb', 'her', 'int', 'mer', 'osab', 'our', 'tar', 'seg',
+  'ses', 'bark', 'bilb', 'vilb', 'mar', 'ponb', 'cor', 'casc', 'sabd', 'num',
+])
+
+const federacionRosterExtensionShape: Position[] = ['GK', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'FWD']
+const federacionTargetRosterSize = 20
+
+function getRosterEntries(team: TeamSeedWithDivision): RosterEntry[] {
+  const baseRoster = teamRosters[team.id] ?? []
+
+  if (!primeraFederacionRosterIds.has(team.id) || baseRoster.length >= federacionTargetRosterSize) {
+    return baseRoster
+  }
+
+  const needed = federacionTargetRosterSize - baseRoster.length
+  const offset = hashText(`fed-extra-${team.id}`) % lowerDivisionFallbackRealNames.length
+  const usedNames = new Set(baseRoster.map((entry) => entry.name))
+  const extras: RosterEntry[] = []
+
+  for (let index = 0; extras.length < needed && index < lowerDivisionFallbackRealNames.length * 2; index += 1) {
+    const candidateName = lowerDivisionFallbackRealNames[(offset + index * 7) % lowerDivisionFallbackRealNames.length]
+    if (usedNames.has(candidateName)) {
+      continue
+    }
+
+    extras.push({
+      name: candidateName,
+      position: federacionRosterExtensionShape[extras.length % federacionRosterExtensionShape.length],
+    })
+    usedNames.add(candidateName)
+  }
+
+  return [...baseRoster, ...extras]
 }
 
 const youthShape = ['GK', 'DEF', 'MID', 'FWD'] as const
@@ -810,8 +1530,8 @@ function buildPlayerName(seed: number): string {
   return `${first} ${last}`
 }
 
-function buildPlayer(team: TeamSeed, teamIndex: number, playerIndex: number): Player {
-  const roster = teamRosters[team.id]?.[playerIndex]
+function buildPlayer(team: TeamSeedWithDivision, teamIndex: number, playerIndex: number): Player {
+  const roster = getRosterEntries(team)[playerIndex]
   const position: Position = roster?.position ?? squadShape[playerIndex] ?? 'MID'
   const seed = hashText(`${team.id}-${playerIndex}`)
 
@@ -832,7 +1552,10 @@ function buildPlayer(team: TeamSeed, teamIndex: number, playerIndex: number): Pl
   const fallbackOverall = Math.max(62, Math.min(92, baseByPosition[position] + tierOffset + variance))
   const overall = roster?.name ? playerOverallOverrides[roster.name] ?? fallbackOverall : fallbackOverall
 
-  const playerName = roster?.name ?? buildPlayerName(seed + teamIndex * 10)
+  const fallbackName = team.division === 'Primera'
+    ? buildPlayerName(seed + teamIndex * 10)
+    : lowerDivisionFallbackRealNames[(seed + teamIndex * 17 + playerIndex * 13) % lowerDivisionFallbackRealNames.length]
+  const playerName = roster?.name ?? fallbackName
   const naturalPositions = inferNaturalPositions(position, playerIndex)
 
   return {
@@ -868,7 +1591,7 @@ function buildYouth(team: TeamSeed, index: number): YouthPlayer {
   }
 }
 
-function toTeam(base: TeamSeed, teamIndex: number): Team {
+function toTeam(base: TeamSeedWithDivision, teamIndex: number): Team {
   const players = squadShape.map((_, idx) => buildPlayer(base, teamIndex, idx))
 
   return {
@@ -955,15 +1678,48 @@ function generateRoundRobin(teamIds: string[]): LeagueState['fixtures'] {
 }
 
 export function createInitialLeagueState(): LeagueState {
-  const teams = baseTeams.map(toTeam)
-  const fixtures = generateRoundRobin(teams.map((team) => team.id))
+  const divisionSeeds: TeamSeedWithDivision[] = [
+    ...baseTeams.map((team) => ({ ...team, division: 'Primera' as const })),
+    ...segundaTeams.map((team) => ({ ...team, division: 'Segunda' as const, regionalGroup: segundaRegionalGroups[team.id] })),
+    ...primeraFederacionGroupOneTeams.map((team) => ({ ...team, division: 'Primera Federacion' as const, group: 'Grupo 1' as const, regionalGroup: primeraFederacionRegionalGroups[team.id] ?? 'Grupo 1' })),
+    ...primeraFederacionGroupTwoTeams.map((team) => ({ ...team, division: 'Primera Federacion' as const, group: 'Grupo 2' as const, regionalGroup: primeraFederacionRegionalGroups[team.id] ?? 'Grupo 2' })),
+  ]
+
+  const teams = divisionSeeds.map(toTeam)
+  const { fixtures, totalRounds } = buildSeasonFixtures(teams)
 
   return {
     currentRound: 1,
-    totalRounds: teams.length % 2 === 0 ? (teams.length - 1) * 2 : teams.length * 2,
+    totalRounds,
     teams,
     fixtures,
     lastResults: [],
     news: ['Temporada iniciada: la prensa espera una liga muy igualada.'],
+    promotionSummary: [],
+    promotionBracket: null,
+  }
+}
+
+function roundCountForTeamCount(teamCount: number): number {
+  return teamCount % 2 === 0 ? (teamCount - 1) * 2 : teamCount * 2
+}
+
+export function buildSeasonFixtures(teams: Team[]): { fixtures: LeagueState['fixtures']; totalRounds: number } {
+  const competitions = [
+    teams.filter((team) => team.division === 'Primera').map((team) => team.id),
+    teams.filter((team) => team.division === 'Segunda').map((team) => team.id),
+    teams.filter((team) => team.division === 'Primera Federacion' && team.group === 'Grupo 1').map((team) => team.id),
+    teams.filter((team) => team.division === 'Primera Federacion' && team.group === 'Grupo 2').map((team) => team.id),
+  ].filter((teamIds) => teamIds.length > 0)
+
+  const fixtures = competitions.flatMap((teamIds) => generateRoundRobin(teamIds))
+
+  const totalRounds = Math.max(
+    ...competitions.map((teamIds) => roundCountForTeamCount(teamIds.length)),
+  )
+
+  return {
+    fixtures,
+    totalRounds,
   }
 }

@@ -79,6 +79,29 @@ h2 {
   font-size: 0.95rem;
 }
 
+.competition-badge,
+.table-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid rgb(223 163 111 / 0.45);
+  background: rgb(58 31 9 / 0.72);
+  color: #ffd18b;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.table-badge {
+  margin-left: 0.35rem;
+}
+
+.inline-badge {
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
 .team-with-crest {
   display: inline-flex;
   align-items: center;
@@ -633,6 +656,87 @@ td:nth-child(6) {
 .fixture-list li span:last-child,
 .results-list li span:last-child {
   text-align: right;
+}
+
+.promotion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+}
+
+.promotion-card {
+  padding: 0.95rem;
+  border: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgb(8 31 45 / 0.72), rgb(5 18 28 / 0.92));
+}
+
+.promotion-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.98rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.promotion-label {
+  margin: 0.75rem 0 0.35rem;
+  color: var(--ink-dim);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.promotion-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.promotion-list.compact {
+  gap: 0.15rem;
+  font-size: 0.9rem;
+}
+
+.promotion-ties {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.promotion-tie {
+  padding: 0.7rem;
+  border: 1px solid rgb(130 206 216 / 0.22);
+  background: rgb(6 22 33 / 0.8);
+}
+
+.promotion-tie-title,
+.promotion-tie-pairing,
+.promotion-aggregate {
+  margin: 0;
+}
+
+.promotion-tie-title {
+  color: #d7eef2;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.promotion-tie-pairing {
+  margin-top: 0.2rem;
+  color: #e7f9fc;
+  font-size: 0.92rem;
+}
+
+.promotion-aggregate {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  color: #ffd18b;
+  font-size: 0.85rem;
+}
+
+.promotion-winner {
+  margin: 0.45rem 0 0;
+  color: #ffd18b;
 }
 
 .news-list li {

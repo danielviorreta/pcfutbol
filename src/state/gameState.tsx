@@ -106,7 +106,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [games, activeGameId],
   )
   const managerTeam = useMemo(() => getManagerTeam(game), [game])
-  const table = useMemo(() => (game ? sortLeagueTable(game.leagueState.teams) : []), [game])
+  const table = useMemo(() => {
+    if (!game) {
+      return []
+    }
+
+    const manager = game.leagueState.teams.find((team) => team.id === game.managerTeamId)
+    if (!manager) {
+      return sortLeagueTable(game.leagueState.teams)
+    }
+
+    return sortLeagueTable(
+      game.leagueState.teams.filter((team) =>
+        team.division === manager.division &&
+        (manager.division !== 'Primera Federacion' || team.group === manager.group),
+      ),
+    )
+  }, [game])
   const transferTargets = useMemo(
     () => (game ? getTransferTargets(game.leagueState, game.managerTeamId) : []),
     [game],

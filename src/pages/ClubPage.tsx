@@ -51,6 +51,9 @@ export function ClubPage() {
     <section className="page-grid">
       <article className="panel">
         <h2>Finanzas y Sponsor</h2>
+        <p>
+          Competicion: <span className="competition-badge">{managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</span>
+        </p>
         <p>Presupuesto: <strong>{formatCurrency(managerTeam.budget)}</strong></p>
         <p>Nomina semanal: {formatCurrency(payroll)}</p>
         <p>Sponsor: {managerTeam.sponsor.name}</p>

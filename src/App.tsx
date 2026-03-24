@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardPage } from './pages/DashboardPage'
 import { ClubPage } from './pages/ClubPage'
 import { GamesPage } from './pages/GamesPage'
+import { PromotionPage } from './pages/PromotionPage'
 import { SquadPage } from './pages/SquadPage'
 import { TransfersPage } from './pages/TransfersPage'
 import { useGame } from './state/gameState'
@@ -42,6 +43,9 @@ function App() {
                 <ClubBadge teamName={managerTeam.name} crestUrl={managerTeam.crestUrl} />
                 <span>{managerTeam.name}</span>
               </strong>
+              <span className="competition-badge">
+                {managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}
+              </span>
             </div>
           </div>
         ) : (
@@ -57,6 +61,7 @@ function App() {
         {game && <NavLink to="/dashboard">Dashboard</NavLink>}
         {game && <NavLink to="/squad">Plantilla</NavLink>}
         {game && <NavLink to="/club">Club</NavLink>}
+        {game && <NavLink to="/promotions">Ascensos</NavLink>}
         {game && <NavLink to="/transfers">Mercado</NavLink>}
       </nav>
 
@@ -75,6 +80,7 @@ function App() {
         <Route path="/dashboard" element={game ? <DashboardPage /> : <Navigate to="/games" replace />} />
         <Route path="/squad" element={game ? <SquadPage /> : <Navigate to="/games" replace />} />
         <Route path="/club" element={game ? <ClubPage /> : <Navigate to="/games" replace />} />
+        <Route path="/promotions" element={game ? <PromotionPage /> : <Navigate to="/games" replace />} />
         <Route path="/transfers" element={game ? <TransfersPage /> : <Navigate to="/games" replace />} />
       </Routes>
     </main>

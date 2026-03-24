@@ -8,6 +8,29 @@ interface SaveStorage {
 const STORAGE_KEY = 'pcfutbol-legacy-saves'
 const LEGACY_STORAGE_KEY = 'pcfutbol-legacy-save'
 
+const SEGUNDA_REGIONAL_GROUPS: Record<string, 'Grupo 1' | 'Grupo 2'> = {
+  lev: 'Grupo 2',
+  eib: 'Grupo 1',
+  ten: 'Grupo 2',
+  zar: 'Grupo 1',
+  ovi: 'Grupo 1',
+  spo: 'Grupo 1',
+  rac: 'Grupo 1',
+  alb: 'Grupo 2',
+  bur: 'Grupo 1',
+  car: 'Grupo 2',
+  mir: 'Grupo 1',
+  dep: 'Grupo 1',
+  hue: 'Grupo 1',
+  and: 'Grupo 2',
+  pon: 'Grupo 1',
+  lug: 'Grupo 1',
+  cas: 'Grupo 2',
+  fer: 'Grupo 1',
+  eld: 'Grupo 2',
+  leg: 'Grupo 2',
+}
+
 function isValidGame(game: Partial<ManagerGameState>): game is ManagerGameState {
   return (
     typeof game.id === 'string' &&
@@ -53,12 +76,29 @@ function persistStorage(storage: SaveStorage): void {
 }
 
 function normalizeGame(game: ManagerGameState): ManagerGameState {
+  const primeraFederacionTeams = game.leagueState.teams.filter((team) => team.division === 'Primera Federacion')
+  const groupOneIds = new Set(primeraFederacionTeams.slice(0, 20).map((team) => team.id))
+
   return {
     ...game,
     leagueState: {
       ...game.leagueState,
+      promotionSummary: game.leagueState.promotionSummary ?? [],
+      promotionBracket: game.leagueState.promotionBracket ?? null,
       teams: game.leagueState.teams.map((team) => ({
         ...team,
+        division: team.division ?? 'Primera',
+        group:
+          team.division === 'Primera Federacion'
+            ? (team.group ?? (groupOneIds.has(team.id) ? 'Grupo 1' : 'Grupo 2'))
+            : undefined,
+        regionalGroup:
+          team.regionalGroup ??
+          (team.division === 'Segunda'
+            ? SEGUNDA_REGIONAL_GROUPS[team.id]
+            : team.division === 'Primera Federacion'
+            ? (team.group ?? (groupOneIds.has(team.id) ? 'Grupo 1' : 'Grupo 2'))
+            : undefined),
         staff: team.staff ?? { medicalLevel: 1, disciplineLevel: 1 },
         players: team.players.map((player) => ({
           ...player,

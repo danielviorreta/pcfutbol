@@ -32,6 +32,9 @@ export function LeagueTable({ teams }: { teams: Team[] }) {
                 <div className="team-with-crest">
                   <ClubBadge teamName={team.name} crestUrl={team.crestUrl} />
                   <span>{team.name}</span>
+                  <span className="table-badge">
+                    {team.division === 'Primera Federacion' ? team.group : team.division}
+                  </span>
                 </div>
               </td>
               <td>{team.points}</td>

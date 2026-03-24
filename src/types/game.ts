@@ -17,6 +17,8 @@ export type RolePosition =
   | 'ST'
 export type Tactic = '4-3-3' | '4-4-2' | '5-4-1'
 export type TrainingFocus = 'fitness' | 'attack' | 'midfield' | 'defense'
+export type Division = 'Primera' | 'Segunda' | 'Primera Federacion'
+export type CompetitionGroup = 'Grupo 1' | 'Grupo 2'
 
 export interface Player {
   id: string
@@ -68,6 +70,9 @@ export interface ClubStaff {
 export interface Team {
   id: string
   name: string
+  division: Division
+  group?: CompetitionGroup
+  regionalGroup?: CompetitionGroup
   crestUrl?: string
   tactic: Tactic
   stadium: Stadium
@@ -108,6 +113,41 @@ export interface MatchResult {
   awayGoals: number
 }
 
+export interface PlayoffLeg {
+  homeTeam: string
+  awayTeam: string
+  homeGoals: number
+  awayGoals: number
+}
+
+export interface PlayoffTie {
+  label: string
+  teamA: string
+  teamB: string
+  legs: PlayoffLeg[]
+  winner: string
+}
+
+export interface PromotionBracket {
+  segundaToPrimera: {
+    directPromotions: string[]
+    playoffTeams: string[]
+    semiFinals: PlayoffTie[]
+    final?: PlayoffTie | null
+    playoffWinner?: string
+    relegatedFromPrimera: string[]
+  }
+  federacionToSegunda: {
+    directPromotions: string[]
+    playoffTeams: string[]
+    quarterFinals: PlayoffTie[]
+    semiFinals: PlayoffTie[]
+    final?: PlayoffTie | null
+    playoffWinners: string[]
+    relegatedFromSegunda: string[]
+  }
+}
+
 export interface LeagueState {
   currentRound: number
   totalRounds: number
@@ -115,6 +155,8 @@ export interface LeagueState {
   fixtures: Fixture[]
   lastResults: MatchResult[]
   news: string[]
+  promotionSummary: string[]
+  promotionBracket: PromotionBracket | null
 }
 
 export interface ManagerGameState {
