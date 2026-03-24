@@ -1,4 +1,5 @@
 import type { Team } from '../types/game'
+import { ClubBadge } from './ClubBadge'
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-ES', {
@@ -27,7 +28,12 @@ export function LeagueTable({ teams }: { teams: Team[] }) {
           return (
             <tr key={team.id}>
               <td>{index + 1}</td>
-              <td>{team.name}</td>
+              <td>
+                <div className="team-with-crest">
+                  <ClubBadge teamName={team.name} crestUrl={team.crestUrl} />
+                  <span>{team.name}</span>
+                </div>
+              </td>
               <td>{team.points}</td>
               <td>{team.played}</td>
               <td>{goalDiff >= 0 ? `+${goalDiff}` : goalDiff}</td>

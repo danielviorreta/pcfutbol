@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialLeagueState } from '../data/seedData'
 import { useGame } from '../state/gameState'
+import { ClubBadge } from '../components/ClubBadge'
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('es-ES', {
@@ -18,6 +19,7 @@ export function GamesPage() {
   const [saveName, setSaveName] = useState('Carrera 1')
   const [managerName, setManagerName] = useState('Mister')
   const [managerTeamId, setManagerTeamId] = useState(clubs[0]?.id ?? '')
+  const selectedClub = clubs.find((club) => club.id === managerTeamId) ?? null
 
   const submitGame = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -53,6 +55,12 @@ export function GamesPage() {
               ))}
             </select>
           </label>
+          {selectedClub && (
+            <div className="selected-club-preview" aria-live="polite">
+              <ClubBadge teamName={selectedClub.name} crestUrl={selectedClub.crestUrl} />
+              <strong>{selectedClub.name}</strong>
+            </div>
+          )}
           <button type="submit">Crear Carrera</button>
         </form>
       </article>

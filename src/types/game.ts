@@ -37,6 +37,7 @@ export interface SponsorDeal {
 export interface Team {
   id: string
   name: string
+  crestUrl?: string
   budget: number
   morale: number
   attack: number

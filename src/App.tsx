@@ -5,6 +5,7 @@ import { GamesPage } from './pages/GamesPage'
 import { SquadPage } from './pages/SquadPage'
 import { TransfersPage } from './pages/TransfersPage'
 import { useGame } from './state/gameState'
+import { ClubBadge } from './components/ClubBadge'
 import './App.css'
 
 function App() {
@@ -37,7 +38,10 @@ function App() {
             </label>
             <div className="manager-club">
               Club
-              <strong>{managerTeam.name}</strong>
+              <strong className="team-with-crest">
+                <ClubBadge teamName={managerTeam.name} crestUrl={managerTeam.crestUrl} />
+                <span>{managerTeam.name}</span>
+              </strong>
             </div>
           </div>
         ) : (
