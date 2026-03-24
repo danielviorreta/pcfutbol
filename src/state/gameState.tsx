@@ -191,7 +191,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         managerLineup: prev.managerLineup,
       })
 
-      const { nextState, headlines } = applyWeeklyClubManagement(simulatedState, prev.managerTeamId)
+      const { nextState, headlines } = applyWeeklyClubManagement(simulatedState)
       const withWeeklyNews = {
         ...nextState,
         news: [...headlines, ...nextState.news].slice(0, 12),

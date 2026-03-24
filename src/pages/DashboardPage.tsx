@@ -33,6 +33,33 @@ export function DashboardPage() {
     saveCurrentGame,
   } = useGame()
 
+  const divisionTables: Record<DashboardCompetition, typeof table> = useMemo(() => {
+    if (!game) {
+      return {
+        Primera: [],
+        Segunda: [],
+        'Primera Federacion - Grupo 1': [],
+        'Primera Federacion - Grupo 2': [],
+      }
+    }
+
+    return {
+      Primera: sortLeagueTable(game.leagueState.teams.filter((team) => team.division === 'Primera')),
+      Segunda: sortLeagueTable(game.leagueState.teams.filter((team) => team.division === 'Segunda')),
+      'Primera Federacion - Grupo 1': sortLeagueTable(game.leagueState.teams.filter((team) => team.division === 'Primera Federacion' && team.group === 'Grupo 1')),
+      'Primera Federacion - Grupo 2': sortLeagueTable(game.leagueState.teams.filter((team) => team.division === 'Primera Federacion' && team.group === 'Grupo 2')),
+    }
+  }, [game])
+
+  const initialDivision: DashboardCompetition = managerTeam
+    ? (managerTeam.division === 'Primera Federacion'
+      ? `Primera Federacion - ${managerTeam.group ?? 'Grupo 1'}`
+      : managerTeam.division)
+    : 'Primera'
+
+  const [activeDivision, setActiveDivision] = useState<DashboardCompetition>(initialDivision as DashboardCompetition)
+  const selectedDivision: DashboardCompetition = divisionTables[activeDivision].length > 0 ? activeDivision : initialDivision
+
   if (!game || !managerTeam) {
     return null
   }
@@ -55,19 +82,6 @@ export function DashboardPage() {
         && (managerTeam.division !== 'Primera Federacion' || homeTeam.group === managerTeam.group)
     })
     .slice(0, 4)
-
-  const divisionTables: Record<DashboardCompetition, typeof table> = useMemo(() => ({
-    Primera: sortLeagueTable(leagueState.teams.filter((team) => team.division === 'Primera')),
-    Segunda: sortLeagueTable(leagueState.teams.filter((team) => team.division === 'Segunda')),
-    'Primera Federacion - Grupo 1': sortLeagueTable(leagueState.teams.filter((team) => team.division === 'Primera Federacion' && team.group === 'Grupo 1')),
-    'Primera Federacion - Grupo 2': sortLeagueTable(leagueState.teams.filter((team) => team.division === 'Primera Federacion' && team.group === 'Grupo 2')),
-  }), [leagueState.teams])
-
-  const initialDivision: DashboardCompetition = managerTeam.division === 'Primera Federacion'
-    ? `Primera Federacion - ${managerTeam.group ?? 'Grupo 1'}`
-    : managerTeam.division
-  const [activeDivision, setActiveDivision] = useState<DashboardCompetition>(initialDivision as DashboardCompetition)
-  const selectedDivision: DashboardCompetition = divisionTables[activeDivision].length > 0 ? activeDivision : initialDivision
 
   return (
     <section className="page-grid">

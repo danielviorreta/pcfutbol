@@ -71,20 +71,22 @@ function formatCurrency(value: number): string {
 export function SquadPage() {
   const { game, managerTeam, setLineupSlotPlayer, autoPickLineup, setTactic } = useGame()
 
-  if (!game || !managerTeam) {
-    return null
-  }
-
-  const lineupPlayers = getLineupPlayers(managerTeam, game.managerLineup)
-  const assignments = getLineupAssignments(managerTeam, game.managerLineup)
-  const unavailableCount = managerTeam.players.filter(
-    (player) => player.injuryWeeks > 0 || player.suspensionWeeks > 0,
-  ).length
+  const lineupPlayers = useMemo(
+    () => (game && managerTeam ? getLineupPlayers(managerTeam, game.managerLineup) : []),
+    [game, managerTeam],
+  )
+  const assignments = useMemo(
+    () => (game && managerTeam ? getLineupAssignments(managerTeam, game.managerLineup) : []),
+    [game, managerTeam],
+  )
+  const unavailableCount = managerTeam
+    ? managerTeam.players.filter((player) => player.injuryWeeks > 0 || player.suspensionWeeks > 0).length
+    : 0
 
   const selectedBySlot = assignments.map((item) => item.player?.id ?? '')
   const selectedSet = new Set(selectedBySlot.filter(Boolean))
 
-  const tactic = (managerTeam.tactic ?? '4-3-3') as Tactic
+  const tactic = (managerTeam?.tactic ?? '4-3-3') as Tactic
   const roleByPlayerId = useMemo(
     () =>
       new Map(
@@ -102,11 +104,15 @@ export function SquadPage() {
         )
       : 0
 
-  const sortedPlayers = managerTeam.players
-    .slice()
-    .sort((a, b) => b.overall - a.overall)
+  const sortedPlayers = managerTeam
+    ? managerTeam.players.slice().sort((a, b) => b.overall - a.overall)
+    : []
 
   const mapCoords = tacticSlotCoords[tactic]
+
+  if (!game || !managerTeam) {
+    return null
+  }
 
   return (
     <section className="page-grid squad-grid">
