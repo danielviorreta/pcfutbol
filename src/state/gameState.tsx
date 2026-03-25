@@ -636,6 +636,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
       }
     })
+    setNotice('Jornada completada. Partida guardada automaticamente.')
   }
 
   const prepareMatchPresentation = (): boolean => {
@@ -716,6 +717,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     )
 
     persistCollection(nextGames, nextGame.id)
+    setNotice('Jornada completada. Partida guardada automaticamente.')
 
     const result = withWeeklyNews.lastResults.find((item) => item.fixtureId === matchPresentation.fixtureId)
     const homeTeamAfterMatch = withWeeklyNews.teams.find((team) => team.id === matchPresentation.homeTeamId)
