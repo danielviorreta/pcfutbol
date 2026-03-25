@@ -1,7 +1,7 @@
 import { useMemo, useState, type DragEvent } from 'react'
 import { getLineupAssignments, getLineupPlayers, isPlayerAvailable } from '../engine/squad'
 import { useGame } from '../state/gameState'
-import type { Tactic } from '../types/game'
+import type { Player, RolePosition, Tactic } from '../types/game'
 
 const tacticOptions: { value: Tactic; label: string }[] = [
   { value: '4-3-3', label: '4-3-3' },
@@ -51,6 +51,24 @@ const tacticSlotCoords: Record<Tactic, { x: number; y: number }[]> = {
   ],
 }
 
+const roleDotCoords: Record<RolePosition, { x: number; y: number }> = {
+  GK: { x: 50, y: 88 },
+  RB: { x: 82, y: 72 },
+  CB: { x: 50, y: 74 },
+  LB: { x: 18, y: 72 },
+  RWB: { x: 86, y: 66 },
+  LWB: { x: 14, y: 66 },
+  DM: { x: 50, y: 60 },
+  CM: { x: 50, y: 50 },
+  AM: { x: 50, y: 38 },
+  RM: { x: 78, y: 50 },
+  LM: { x: 22, y: 50 },
+  RW: { x: 82, y: 28 },
+  LW: { x: 18, y: 28 },
+  CF: { x: 50, y: 24 },
+  ST: { x: 50, y: 20 },
+}
+
 function shortPlayerName(name: string): string {
   const tokens = name.trim().split(/\s+/)
   if (tokens.length <= 1) {
@@ -91,6 +109,37 @@ function getPlayerStatusInfo(injuryWeeks: number, suspensionWeeks: number, yello
     label: 'Disponible',
     className: 'status-chip is-available',
   }
+}
+
+function getBestRole(player: Player): RolePosition {
+  if (player.naturalPositions && player.naturalPositions.length > 0) {
+    return player.naturalPositions[0]
+  }
+
+  switch (player.position) {
+    case 'GK':
+      return 'GK'
+    case 'DEF':
+      return 'CB'
+    case 'MID':
+      return 'CM'
+    case 'FWD':
+      return 'ST'
+    default:
+      return 'CM'
+  }
+}
+
+function getFitTierClass(fit: number): 'is-good' | 'is-ok' | 'is-bad' {
+  if (fit >= 0.92) {
+    return 'is-good'
+  }
+
+  if (fit >= 0.82) {
+    return 'is-ok'
+  }
+
+  return 'is-bad'
 }
 
 export function SquadPage() {
@@ -291,6 +340,27 @@ export function SquadPage() {
         <p className="squad-hint">
           Arrastra un jugador sobre otro para intercambiarlos. Los titulares aparecen marcados al inicio de la lista.
         </p>
+        <div className="position-legend" aria-label="Leyenda de iconos de posicion">
+          <span className="position-legend-item">
+            <span className="position-legend-dot is-good" aria-hidden="true" />
+            Posicion ideal
+          </span>
+          <span className="position-legend-item">
+            <span className="position-legend-dot is-ok" aria-hidden="true" />
+            Encaje aceptable
+          </span>
+          <span className="position-legend-item">
+            <span className="position-legend-dot is-bad" aria-hidden="true" />
+            Mal encaje
+          </span>
+          <span className="position-legend-item">
+            <span className="position-legend-dot is-neutral" aria-hidden="true" />
+            Posicion actual / suplente
+          </span>
+        </div>
+        <p className="role-legend" aria-label="Leyenda de abreviaturas de posicion">
+          GK: Portero · RB/LB: Lateral der/izq · CB: Central · RWB/LWB: Carrilero der/izq · DM: Pivote defensivo · CM: Centrocampista · AM: Mediapunta · RM/LM: Interior der/izq · RW/LW: Extremo der/izq · CF: Segundo punta · ST: Delantero centro
+        </p>
         <table>
           <thead>
             <tr>
@@ -310,6 +380,9 @@ export function SquadPage() {
           <tbody>
             {sortedPlayers.map((player) => {
               const assigned = roleByPlayerId.get(player.id)
+              const bestRole = getBestRole(player)
+              const isExactRole = assigned ? assigned.role === bestRole : false
+              const bestRoleColorClass = assigned ? getFitTierClass(assigned.fit) : 'is-neutral'
               const status = getPlayerStatusInfo(player.injuryWeeks, player.suspensionWeeks, player.yellowCards)
               const available = isPlayerAvailable(player)
               const isDragging = draggedPlayerId === player.id
@@ -337,6 +410,51 @@ export function SquadPage() {
                   <td className="drag-handle" aria-hidden="true">⠿</td>
                   <td>
                     <span className="player-name-cell">
+                      <span
+                        className="player-pos-icon"
+                        title={
+                          assigned
+                            ? isExactRole
+                              ? `Posicion ideal: ${bestRole}`
+                              : `Mejor: ${bestRole} | Jugando: ${assigned.role}`
+                            : `Mejor posicion: ${bestRole}`
+                        }
+                        aria-label={
+                          assigned
+                            ? isExactRole
+                              ? `Posicion ideal ${bestRole}`
+                              : `Mejor ${bestRole}, jugando ${assigned.role}`
+                            : `Mejor posicion ${bestRole}`
+                        }
+                      >
+                        <span className="player-pos-pitch" aria-hidden="true">
+                          <span className="player-pos-midline" />
+                          {!assigned && (
+                            <span
+                              className="player-pos-dot is-neutral"
+                              style={{ left: `${roleDotCoords[bestRole].x}%`, top: `${roleDotCoords[bestRole].y}%` }}
+                            />
+                          )}
+                          {assigned && isExactRole && (
+                            <span
+                              className="player-pos-dot is-good"
+                              style={{ left: `${roleDotCoords[assigned.role].x}%`, top: `${roleDotCoords[assigned.role].y}%` }}
+                            />
+                          )}
+                          {assigned && !isExactRole && (
+                            <>
+                              <span
+                                className={`player-pos-dot ${bestRoleColorClass}`}
+                                style={{ left: `${roleDotCoords[bestRole].x}%`, top: `${roleDotCoords[bestRole].y}%` }}
+                              />
+                              <span
+                                className="player-pos-dot is-neutral is-current"
+                                style={{ left: `${roleDotCoords[assigned.role].x}%`, top: `${roleDotCoords[assigned.role].y}%` }}
+                              />
+                            </>
+                          )}
+                        </span>
+                      </span>
                       {assigned && (
                         <span className="role-badge">{assigned.role}</span>
                       )}
