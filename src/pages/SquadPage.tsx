@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { getLineupAssignments, getLineupPlayers, isPlayerAvailable } from '../engine/squad'
+import { getLineupAssignments, isPlayerAvailable } from '../engine/squad'
 import { useGame } from '../state/gameState'
 import type { Player, RolePosition, Tactic } from '../types/game'
 
@@ -147,10 +147,6 @@ export function SquadPage() {
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null)
   const [dragOverPlayerId, setDragOverPlayerId] = useState<string | null>(null)
 
-  const lineupPlayers = useMemo(
-    () => (game && managerTeam ? getLineupPlayers(managerTeam, game.managerLineup) : []),
-    [game, managerTeam],
-  )
   const assignments = useMemo(
     () => (game && managerTeam ? getLineupAssignments(managerTeam, game.managerLineup) : []),
     [game, managerTeam],
@@ -270,9 +266,6 @@ export function SquadPage() {
     <section className="page-grid squad-grid">
       <article className="panel">
         <h2>Once Titular</h2>
-        <p>
-          Jugadores seleccionados: <strong>{lineupPlayers.length}</strong> / 11
-        </p>
         <p>Media del once: {averageOverall}</p>
         <p>Bajas actuales: {unavailableCount}</p>
         <div className="actions">
