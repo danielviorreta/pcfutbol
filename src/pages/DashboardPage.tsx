@@ -72,6 +72,17 @@ export function DashboardPage() {
   )
   const isSeasonOver = leagueState.currentRound > leagueState.totalRounds
   const champion = isSeasonOver ? table[0] : null
+  const managerFixture = leagueState.fixtures.find(
+    (fixture) =>
+      fixture.round === leagueState.currentRound
+      && !fixture.played
+      && (fixture.homeTeamId === managerTeam.id || fixture.awayTeamId === managerTeam.id),
+  )
+  const isHomeMatch = managerFixture ? managerFixture.homeTeamId === managerTeam.id : false
+  const opponentId = managerFixture
+    ? (isHomeMatch ? managerFixture.awayTeamId : managerFixture.homeTeamId)
+    : null
+  const opponentName = opponentId ? teamName(opponentId, leagueState.teams) : null
 
   const nextFixtures = leagueState.fixtures
     .filter((fixture) => {
@@ -98,6 +109,17 @@ export function DashboardPage() {
           Jornada {Math.min(leagueState.currentRound, leagueState.totalRounds)} de{' '}
           {leagueState.totalRounds}.
         </p>
+        {!isSeasonOver && managerFixture && opponentName && (
+          <div className="next-match-banner" role="status" aria-live="polite">
+            <p className="next-match-eyebrow">Proximo partido</p>
+            <p className="next-match-main">
+              {managerTeam.name} vs {opponentName}
+            </p>
+            <p className="next-match-meta">
+              {isHomeMatch ? 'Juegas como local' : 'Juegas como visitante'} · Jornada {managerFixture.round}
+            </p>
+          </div>
+        )}
         <p>Presupuesto: {formatCurrency(managerTeam.budget)}</p>
         <p>Nomina semanal: {formatCurrency(payroll)}</p>
         <p>
