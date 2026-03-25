@@ -14,6 +14,46 @@ interface LeagueTableProps {
   managerTeamId?: string
 }
 
+function getZoneClass(team: Team, index: number, totalTeams: number): string | null {
+  if (team.division === 'Primera') {
+    if (index >= totalTeams - 3) {
+      return 'table-row-zone-relegation'
+    }
+
+    return null
+  }
+
+  if (team.division === 'Segunda') {
+    if (index < 2) {
+      return 'table-row-zone-promotion'
+    }
+
+    if (index < 6) {
+      return 'table-row-zone-playoff'
+    }
+
+    if (index >= totalTeams - 4) {
+      return 'table-row-zone-relegation'
+    }
+
+    return null
+  }
+
+  if (team.division === 'Primera Federacion') {
+    if (index < 1) {
+      return 'table-row-zone-promotion'
+    }
+
+    if (index < 5) {
+      return 'table-row-zone-playoff'
+    }
+
+    return null
+  }
+
+  return null
+}
+
 export function LeagueTable({ teams, managerTeamId }: LeagueTableProps) {
   return (
     <table>
@@ -31,8 +71,16 @@ export function LeagueTable({ teams, managerTeamId }: LeagueTableProps) {
         {teams.map((team, index) => {
           const goalDiff = team.goalsFor - team.goalsAgainst
           const isManagerTeam = team.id === managerTeamId
+          const zoneClass = getZoneClass(team, index, teams.length)
+          const rowClassName = [
+            zoneClass,
+            isManagerTeam ? 'table-row-manager' : null,
+          ]
+            .filter(Boolean)
+            .join(' ') || undefined
+
           return (
-            <tr key={team.id} className={isManagerTeam ? 'table-row-manager' : undefined}>
+            <tr key={team.id} className={rowClassName}>
               <td>{index + 1}</td>
               <td>
                 <div className="team-with-crest">

@@ -83,7 +83,7 @@ function getLineupPlayers(team: Team, lineup: string[]): Player[] {
     .filter((player): player is Player => Boolean(player))
 }
 
-function estimateSubstitutionImpact(team: Team, lineup: string[]): { attack: number; defense: number } {
+function getSubstitutionPlan(team: Team, lineup: string[]): { outgoing: Player[]; incoming: Player[] } {
   const lineupIds = new Set(lineup)
   const starters = getLineupPlayers(team, lineup)
   const bench = team.players
@@ -91,13 +91,45 @@ function estimateSubstitutionImpact(team: Team, lineup: string[]): { attack: num
     .sort((a, b) => b.overall - a.overall)
 
   if (starters.length === 0 || bench.length === 0) {
-    return { attack: 0, defense: 0 }
+    return { outgoing: [], incoming: [] }
   }
 
   const outgoing = [...starters]
     .sort((a, b) => (b.fatigue + (100 - b.stamina) * 0.35) - (a.fatigue + (100 - a.stamina) * 0.35))
     .slice(0, 2)
-  const incoming = bench.slice(0, 2)
+  const incoming = bench.slice(0, Math.min(outgoing.length, 2))
+
+  return { outgoing, incoming }
+}
+
+function estimateMinutesDistribution(team: Team, lineup: string[]): Map<string, number> {
+  const minutesByPlayer = new Map<string, number>()
+  const lineupSet = new Set(lineup)
+
+  for (const player of team.players) {
+    minutesByPlayer.set(player.id, lineupSet.has(player.id) ? 90 : 0)
+  }
+
+  const { outgoing, incoming } = getSubstitutionPlan(team, lineup)
+  outgoing.forEach((outPlayer, idx) => {
+    const inPlayer = incoming[idx]
+    if (!inPlayer) return
+
+    const subMinute = 58 + Math.floor(Math.random() * 23)
+    minutesByPlayer.set(outPlayer.id, subMinute)
+    minutesByPlayer.set(inPlayer.id, 90 - subMinute)
+  })
+
+  return minutesByPlayer
+}
+
+function pushRecentMinutes(history: number[] | undefined, minutes: number): number[] {
+  const safe = Array.isArray(history) ? history : []
+  return [...safe, clamp(Math.round(minutes), 0, 90)].slice(-5)
+}
+
+function estimateSubstitutionImpact(team: Team, lineup: string[]): { attack: number; defense: number } {
+  const { outgoing, incoming } = getSubstitutionPlan(team, lineup)
 
   if (outgoing.length === 0 || incoming.length === 0) {
     return { attack: 0, defense: 0 }
@@ -275,6 +307,8 @@ function updateTeamTable(teams: Team[], results: MatchResult[]): Team[] {
 function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[]; incidents: RoundIncidents } {
   const lineupsByTeam = new Map<string, string[]>()
   const outcomesByTeam = new Map<string, 'win' | 'draw' | 'loss'>()
+  const teamsById = new Map(teams.map((team) => [team.id, team]))
+  const minutesByTeam = new Map<string, Map<string, number>>()
   const incidents: RoundIncidents = {
     injuries: [],
     bookings: [],
@@ -285,6 +319,15 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
   for (const pack of packs) {
     lineupsByTeam.set(pack.fixture.homeTeamId, pack.homeLineup)
     lineupsByTeam.set(pack.fixture.awayTeamId, pack.awayLineup)
+
+    const homeTeam = teamsById.get(pack.fixture.homeTeamId)
+    const awayTeam = teamsById.get(pack.fixture.awayTeamId)
+    if (homeTeam) {
+      minutesByTeam.set(homeTeam.id, estimateMinutesDistribution(homeTeam, pack.homeLineup))
+    }
+    if (awayTeam) {
+      minutesByTeam.set(awayTeam.id, estimateMinutesDistribution(awayTeam, pack.awayLineup))
+    }
 
     if (pack.result.homeGoals > pack.result.awayGoals) {
       outcomesByTeam.set(pack.fixture.homeTeamId, 'win')
@@ -301,6 +344,7 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
   const nextTeams = teams.map((team) => {
     const lineup = lineupsByTeam.get(team.id)
     const outcome = outcomesByTeam.get(team.id)
+    const teamMinutes = minutesByTeam.get(team.id)
 
     if (!lineup) {
       return {
@@ -309,25 +353,30 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
           ...player,
           fatigue: clamp(player.fatigue - 6, 0, 100),
           form: clamp(player.form + 1, 40, 99),
+          happiness: clamp(player.happiness + 1, 35, 99),
+          recentMinutes: pushRecentMinutes(player.recentMinutes, 0),
         })),
       }
     }
 
-    const lineupSet = new Set(lineup)
-
     return {
       ...team,
       players: team.players.map((player) => {
-        if (!lineupSet.has(player.id)) {
+        const minutesPlayed = teamMinutes?.get(player.id) ?? 0
+        if (minutesPlayed <= 0) {
           return {
             ...player,
             fatigue: clamp(player.fatigue - 9, 0, 100),
             form: clamp(player.form + 1, 40, 99),
+            happiness: clamp(player.happiness - 1, 35, 99),
+            recentMinutes: pushRecentMinutes(player.recentMinutes, 0),
           }
         }
 
+        const minuteShare = minutesPlayed / 90
         const fatigueInc =
-          7
+          3
+          + Math.round(5 * minuteShare)
           + Math.floor(Math.random() * 5)
           + Math.max(0, Math.floor((100 - player.stamina) / 18))
           + Math.max(0, Math.floor((player.fatigue - 60) / 12))
@@ -335,13 +384,15 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
 
         const formDelta = outcome === 'win' ? 2 : outcome === 'loss' ? -2 : 0
         const form = clamp(player.form + formDelta, 35, 99)
+        const happinessDelta = outcome === 'win' ? 1 : outcome === 'loss' ? -2 : 0
 
         const injuryChance = getInjuryChance(team, player.stamina, fatigue)
         const yellowChance = getYellowCardChance(team, player.id, fatigue)
         const redChance = clamp((0.004 + fatigue / 5000) * (1 - (team.staff.disciplineLevel - 1) * 0.1), 0.002, 0.035)
+        const participationFactor = 0.25 + minuteShare * 0.75
 
-        const gotYellow = isPlayerAvailable(player) && Math.random() < yellowChance
-        const gotRed = isPlayerAvailable(player) && Math.random() < redChance
+        const gotYellow = isPlayerAvailable(player) && Math.random() < yellowChance * participationFactor
+        const gotRed = isPlayerAvailable(player) && Math.random() < redChance * participationFactor
 
         let yellowCards = gotYellow ? player.yellowCards + 1 : player.yellowCards
         if (gotRed) {
@@ -368,7 +419,7 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
           incidents.suspensions.push(`${player.name} (${team.name}) quedo sancionado para la proxima jornada.`)
         }
 
-        const injuryWeeks = isPlayerAvailable(player) && Math.random() < injuryChance
+        const injuryWeeks = isPlayerAvailable(player) && Math.random() < injuryChance * participationFactor
           ? getInjuryDuration(fatigue)
           : player.injuryWeeks
 
@@ -380,9 +431,11 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
           ...player,
           fatigue,
           form,
+          happiness: clamp(player.happiness + happinessDelta, 35, 99),
           injuryWeeks,
           suspensionWeeks,
           yellowCards,
+          recentMinutes: pushRecentMinutes(player.recentMinutes, minutesPlayed),
         }
       }),
     }

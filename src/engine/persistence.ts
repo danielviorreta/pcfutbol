@@ -1,4 +1,6 @@
+import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
 import type { GameSummary, ManagerGameState } from '../types/game'
+import { PLAYER_REAL_AGES } from '../data/playerRealData'
 
 interface SaveStorage {
   games: ManagerGameState[]
@@ -7,6 +9,46 @@ interface SaveStorage {
 
 const STORAGE_KEY = 'pcfutbol-legacy-saves'
 const LEGACY_STORAGE_KEY = 'pcfutbol-legacy-save'
+const DEFAULT_SEASON_START_YEAR = 2025
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function hashText(text: string): number {
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+function estimateMissingPlayerAge(
+  player: { id: string; name?: string; position: string; overall: number; contractYears?: number },
+  division?: string,
+): number {
+  const byName = player.name ? PLAYER_REAL_AGES[player.name] : undefined
+  if (typeof byName === 'number') {
+    return clamp(Math.round(byName), 16, 40)
+  }
+
+  const seed = hashText(player.id)
+  const positionBase =
+    player.position === 'GK'
+      ? 29
+      : player.position === 'DEF'
+        ? 27
+        : player.position === 'MID'
+          ? 26
+          : 25
+  const divisionBias = division === 'Primera' ? 1 : division === 'Segunda' ? 0 : -1
+  const qualityBias = player.overall >= 88 ? 2 : player.overall >= 82 ? 1 : player.overall <= 70 ? -2 : 0
+  const contractBias = (player.contractYears ?? 3) >= 4 ? -1 : (player.contractYears ?? 3) <= 1 ? 2 : 0
+  const variance = (seed % 7) - 3
+
+  return clamp(positionBase + divisionBias + qualityBias + contractBias + variance, 17, 38)
+}
 
 const SEGUNDA_REGIONAL_GROUPS: Record<string, 'Grupo 1' | 'Grupo 2'> = {
   lev: 'Grupo 2',
@@ -64,9 +106,12 @@ function makeMigratedLegacyGame(legacy: Partial<ManagerGameState>): ManagerGameS
     saveName: `${legacy.managerName} - ${managerTeam?.name ?? 'Carrera'}`,
     createdAt: now,
     updatedAt: now,
+    seasonStartYear: DEFAULT_SEASON_START_YEAR,
     managerName: legacy.managerName,
     managerTeamId: legacy.managerTeamId,
     managerLineup: legacy.managerLineup,
+    pendingTransferOffers: [],
+    pendingRenewalOffers: [],
     leagueState: legacy.leagueState,
   }
 }
@@ -81,6 +126,16 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
 
   return {
     ...game,
+    seasonStartYear:
+      typeof (game as Partial<ManagerGameState>).seasonStartYear === 'number'
+        ? (game as Partial<ManagerGameState>).seasonStartYear as number
+        : DEFAULT_SEASON_START_YEAR,
+    pendingTransferOffers: Array.isArray((game as Partial<ManagerGameState>).pendingTransferOffers)
+      ? (game as Partial<ManagerGameState>).pendingTransferOffers ?? []
+      : [],
+    pendingRenewalOffers: Array.isArray((game as Partial<ManagerGameState>).pendingRenewalOffers)
+      ? (game as Partial<ManagerGameState>).pendingRenewalOffers ?? []
+      : [],
     leagueState: {
       ...game.leagueState,
       promotionSummary: game.leagueState.promotionSummary ?? [],
@@ -102,7 +157,48 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
         staff: team.staff ?? { medicalLevel: 1, disciplineLevel: 1 },
         players: team.players.map((player) => ({
           ...player,
+          age:
+            typeof player.age === 'number'
+              ? clamp(Math.round(player.age), 16, 40)
+              : estimateMissingPlayerAge(player, team.division),
           yellowCards: player.yellowCards ?? 0,
+          happiness:
+            typeof player.happiness === 'number'
+              ? player.happiness
+              : estimatePlayerHappiness(team, player.contractYears ?? 3),
+          releaseClause:
+            typeof player.releaseClause === 'number'
+              ? player.releaseClause
+              : estimateReleaseClause(
+                {
+                  value: player.value,
+                  overall: player.overall,
+                  wage: player.wage,
+                  contractYears: player.contractYears ?? 3,
+                },
+                team,
+                typeof player.happiness === 'number'
+                  ? player.happiness
+                  : estimatePlayerHappiness(team, player.contractYears ?? 3),
+              ),
+          transferListed: Boolean((player as Partial<typeof player>).transferListed),
+          askingPrice:
+            typeof (player as Partial<typeof player>).askingPrice === 'number'
+              ? Math.max(100_000, Math.round((player as Partial<typeof player>).askingPrice as number))
+              : typeof player.releaseClause === 'number'
+                ? player.releaseClause
+                : estimateReleaseClause(
+                  {
+                    value: player.value,
+                    overall: player.overall,
+                    wage: player.wage,
+                    contractYears: player.contractYears ?? 3,
+                  },
+                  team,
+                  typeof player.happiness === 'number'
+                    ? player.happiness
+                    : estimatePlayerHappiness(team, player.contractYears ?? 3),
+                ),
         })),
       })),
     },

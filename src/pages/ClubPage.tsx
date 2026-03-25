@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useGame } from '../state/gameState'
 import type { TrainingFocus } from '../types/game'
 
@@ -21,7 +22,8 @@ export function ClubPage() {
   const {
     managerTeam,
     setTrainingFocus,
-    renewContract,
+    cancelRenewalOffer,
+    pendingRenewalOffers,
     promoteYouth,
     setTicketPrice,
     upgradeStadium,
@@ -158,38 +160,98 @@ export function ClubPage() {
           <thead>
             <tr>
               <th>Jugador</th>
+              <th>Edad</th>
               <th>Pos</th>
               <th>GRL</th>
+              <th>Forma</th>
               <th>Anos</th>
               <th>Sueldo</th>
-              <th>Accion</th>
+              <th>Estado</th>
+              <th>Min. recientes</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {managerTeam.players
               .slice()
               .sort((a, b) => a.contractYears - b.contractYears || b.overall - a.overall)
-              .map((player) => (
-                <tr key={player.id}>
-                  <td>{player.name}</td>
-                  <td>{player.position}</td>
-                  <td>{player.overall}</td>
-                  <td>{player.contractYears}</td>
-                  <td>{formatCurrency(player.wage)}</td>
-                  <td>
-                    <button
-                      className="secondary"
-                      onClick={() => renewContract(player.id)}
-                      disabled={player.contractYears >= 5}
-                    >
-                      Renovar
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              .map((player) => {
+                const hasPendingOffer = pendingRenewalOffers.some((o) => o.playerId === player.id)
+                const recent = player.recentMinutes ?? []
+                const avgMinutes = recent.length > 0
+                  ? Math.round(recent.reduce((sum, value) => sum + value, 0) / recent.length)
+                  : 0
+                return (
+                  <tr key={player.id}>
+                    <td>{player.name}</td>
+                    <td>{player.age ?? 'N/D'}</td>
+                    <td>{player.position}</td>
+                    <td>{player.overall}</td>
+                    <td>{player.form}</td>
+                    <td>{player.contractYears}</td>
+                    <td>{formatCurrency(player.wage)}</td>
+                    <td>
+                      {hasPendingOffer ? (
+                        <span className="status-chip renewal-state-chip is-pending">Pendiente</span>
+                      ) : player.transferListed ? (
+                        <span className="status-chip renewal-state-chip is-blocked">En venta</span>
+                      ) : (
+                        <span className="status-chip renewal-state-chip is-ready">Activo</span>
+                      )}
+                    </td>
+                    <td>{avgMinutes}/90</td>
+                    <td>
+                      <div className="actions compact-actions">
+                        <Link className="secondary" to={`/club/player/${player.id}`}>
+                          Gestionar
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
           </tbody>
         </table>
       </article>
+
+      {pendingRenewalOffers.length > 0 && (
+        <article className="panel table-panel full-span">
+          <h2>Ofertas de Renovación Pendientes</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Jugador</th>
+                <th>Salario ofrecido</th>
+                <th>Años</th>
+                <th>Prima firma</th>
+                <th>Jornada oferta</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingRenewalOffers.map((offer) => (
+                <tr key={offer.id}>
+                  <td>{offer.playerName}</td>
+                  <td>{formatCurrency(offer.wageOffer)}</td>
+                  <td>{offer.contractYears} año{offer.contractYears === 1 ? '' : 's'}</td>
+                  <td>{formatCurrency(offer.signingBonus)}</td>
+                  <td>J{offer.createdRound}</td>
+                  <td>
+                    <div className="actions compact-actions">
+                      <Link className="secondary" to={`/club/player/${offer.playerId}`}>
+                        Abrir ficha
+                      </Link>
+                      <button onClick={() => cancelRenewalOffer(offer.id)}>
+                        Retirar oferta
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </article>
+      )}
 
       <article className="panel table-panel full-span">
         <h2>Cantera</h2>

@@ -20,6 +20,11 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
+function formatSeasonLabel(startYear: number): string {
+  const nextShortYear = String((startYear + 1) % 100).padStart(2, '0')
+  return `${startYear}/${nextShortYear}`
+}
+
 function teamName(teamId: string, teams: { id: string; name: string }[]): string {
   return teams.find((team) => team.id === teamId)?.name ?? teamId
 }
@@ -72,6 +77,17 @@ export function DashboardPage() {
   )
   const isSeasonOver = leagueState.currentRound > leagueState.totalRounds
   const champion = isSeasonOver ? table[0] : null
+  const managerFixture = leagueState.fixtures.find(
+    (fixture) =>
+      fixture.round === leagueState.currentRound
+      && !fixture.played
+      && (fixture.homeTeamId === managerTeam.id || fixture.awayTeamId === managerTeam.id),
+  )
+  const isHomeMatch = managerFixture ? managerFixture.homeTeamId === managerTeam.id : false
+  const opponentId = managerFixture
+    ? (isHomeMatch ? managerFixture.awayTeamId : managerFixture.homeTeamId)
+    : null
+  const opponentName = opponentId ? teamName(opponentId, leagueState.teams) : null
 
   const nextFixtures = leagueState.fixtures
     .filter((fixture) => {
@@ -93,11 +109,23 @@ export function DashboardPage() {
           Bienvenido, <strong>{managerName || 'Mister'}</strong>. Diriges a{' '}
           <strong>{managerTeam.name}</strong>.
         </p>
+        <p>Temporada actual: <strong>{formatSeasonLabel(game.seasonStartYear)}</strong></p>
         <p>Division: {managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</p>
         <p>
           Jornada {Math.min(leagueState.currentRound, leagueState.totalRounds)} de{' '}
           {leagueState.totalRounds}.
         </p>
+        {!isSeasonOver && managerFixture && opponentName && (
+          <div className="next-match-banner" role="status" aria-live="polite">
+            <p className="next-match-eyebrow">Proximo partido</p>
+            <p className="next-match-main">
+              {managerTeam.name} vs {opponentName}
+            </p>
+            <p className="next-match-meta">
+              {isHomeMatch ? 'Juegas como local' : 'Juegas como visitante'} · Jornada {managerFixture.round}
+            </p>
+          </div>
+        )}
         <p>Presupuesto: {formatCurrency(managerTeam.budget)}</p>
         <p>Nomina semanal: {formatCurrency(payroll)}</p>
         <p>
@@ -179,6 +207,11 @@ export function DashboardPage() {
             1a RFEF G2
           </button>
         </div>
+        <p className="table-zone-legend" aria-label="Leyenda de zonas de clasificacion">
+          <span className="zone-pill is-promotion">Ascenso</span>
+          <span className="zone-pill is-playoff">Playoff</span>
+          <span className="zone-pill is-relegation">Descenso</span>
+        </p>
         <LeagueTable teams={divisionTables[selectedDivision]} managerTeamId={managerTeam.id} />
       </article>
 

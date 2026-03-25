@@ -10,6 +10,8 @@ import type {
   TrainingFocus,
   YouthPlayer,
 } from '../types/game'
+import { estimatePlayerHappiness, estimateReleaseClause } from '../engine/playerMarket'
+import { PLAYER_OVERALL_OVERRIDES, PLAYER_REAL_AGES } from './playerRealData'
 
 type TeamSeed = Omit<
   Team,
@@ -513,83 +515,6 @@ function inferNaturalPositions(basePosition: Position, playerIndex: number): Rol
 
   const secondary = secondaryRolesByPrimary[primary][0]
   return secondary ? [primary, secondary] : [primary]
-}
-
-const playerOverallOverrides: Record<string, number> = {
-  'Kylian Mbappe': 91,
-  'Vinicius Junior': 90,
-  'Jude Bellingham': 90,
-  'Thibaut Courtois': 89,
-  'Federico Valverde': 88,
-  'Rodrygo': 87,
-  'Aurelien Tchouameni': 86,
-  'Eduardo Camavinga': 86,
-  'Antonio Rudiger': 87,
-  'Eder Militao': 86,
-  'Ferland Mendy': 82,
-  'Dani Carvajal': 84,
-  'David Alaba': 84,
-  'Luka Modric': 85,
-  'Robert Lewandowski': 88,
-  'Lamine Yamal': 86,
-  Raphinha: 85,
-  Pedri: 87,
-  Gavi: 84,
-  'Frenkie de Jong': 87,
-  'Marc-Andre ter Stegen': 88,
-  'Ronald Araujo': 86,
-  'Jules Kounde': 85,
-  'Dani Olmo': 84,
-  'Jan Oblak': 88,
-  'Antoine Griezmann': 88,
-  'Julian Alvarez': 85,
-  'Rodrigo De Paul': 84,
-  Koke: 83,
-  'Marcos Llorente': 84,
-  'Jose Maria Gimenez': 85,
-  'Robin Le Normand': 84,
-  'Nico Williams': 86,
-  'Inaki Williams': 84,
-  'Unai Simon': 85,
-  'Oihan Sancet': 83,
-  'Alex Berenguer': 81,
-  Isco: 84,
-  'Ayoze Perez': 83,
-  'Giovani Lo Celso': 83,
-  'Pablo Fornals': 80,
-  'Johnny Cardoso': 80,
-  'Iago Aspas': 83,
-  'Borja Iglesias': 78,
-  'Djene Dakonam': 81,
-  'Borja Mayoral': 82,
-  'Luis Milla': 81,
-  'Artem Dovbyk': 84,
-  Savio: 82,
-  'Aleix Garcia': 82,
-  'Yangel Herrera': 81,
-  'Sergi Darder': 81,
-  'Vedat Muriqi': 80,
-  'Ante Budimir': 82,
-  'Mikel Oyarzabal': 84,
-  'Martin Zubimendi': 85,
-  'Mikel Merino': 84,
-  'Takefusa Kubo': 83,
-  'Sergio Ramos': 81,
-  'Youssef En-Nesyri': 81,
-  'Lucas Ocampos': 81,
-  'Giorgi Mamardashvili': 84,
-  'Jose Gaya': 82,
-  Pepelu: 80,
-  'Hugo Duro': 79,
-  'Gerard Moreno': 84,
-  'Dani Parejo': 83,
-  'Alex Baena': 82,
-  'Yeremy Pino': 80,
-  'Raul Albiol': 78,
-  'Conan Ledesma': 80,
-  'Raul de Tomas': 79,
-  'Lucas Boye': 78,
-  'Myrto Uzuni': 79,
 }
 
 const teamRosters: Record<string, RosterEntry[]> = {
@@ -1530,6 +1455,36 @@ function buildPlayerName(seed: number): string {
   return `${first} ${last}`
 }
 
+function buildRealisticPlayerAge(
+  seed: number,
+  position: Position,
+  overall: number,
+  playerIndex: number,
+  division: Division,
+  playerName?: string,
+): number {
+  const realAge = playerName ? PLAYER_REAL_AGES[playerName] : undefined
+  if (typeof realAge === 'number') {
+    return Math.max(16, Math.min(40, realAge))
+  }
+
+  const positionBase =
+    position === 'GK'
+      ? 29
+      : position === 'DEF'
+        ? 27
+        : position === 'MID'
+          ? 26
+          : 25
+
+  const divisionBias = division === 'Primera' ? 1 : division === 'Segunda' ? 0 : -1
+  const qualityBias = overall >= 88 ? 2 : overall >= 82 ? 1 : overall <= 70 ? -2 : 0
+  const roleBias = playerIndex <= 10 ? 1 : playerIndex <= 16 ? 0 : -2
+  const variance = (seed % 7) - 3
+
+  return Math.max(17, Math.min(38, positionBase + divisionBias + qualityBias + roleBias + variance))
+}
+
 function buildPlayer(team: TeamSeedWithDivision, teamIndex: number, playerIndex: number): Player {
   const roster = getRosterEntries(team)[playerIndex]
   const position: Position = roster?.position ?? squadShape[playerIndex] ?? 'MID'
@@ -1550,29 +1505,44 @@ function buildPlayer(team: TeamSeedWithDivision, teamIndex: number, playerIndex:
         : -5
   const variance = (seed % 5) - 2
   const fallbackOverall = Math.max(62, Math.min(92, baseByPosition[position] + tierOffset + variance))
-  const overall = roster?.name ? playerOverallOverrides[roster.name] ?? fallbackOverall : fallbackOverall
+  const overall = roster?.name ? PLAYER_OVERALL_OVERRIDES[roster.name] ?? fallbackOverall : fallbackOverall
 
   const fallbackName = team.division === 'Primera'
     ? buildPlayerName(seed + teamIndex * 10)
     : lowerDivisionFallbackRealNames[(seed + teamIndex * 17 + playerIndex * 13) % lowerDivisionFallbackRealNames.length]
   const playerName = roster?.name ?? fallbackName
   const naturalPositions = inferNaturalPositions(position, playerIndex)
+  const value = Math.round(overall * overall * 14_500)
+  const wage = Math.round(overall * 12_000 + (seed % 90_000))
+  const contractYears = 1 + (seed % 5)
+  const happiness = estimatePlayerHappiness(team, contractYears, ((seed % 11) - 5) * 2)
+  const releaseClause = estimateReleaseClause({ value, wage, overall, contractYears }, team, happiness)
+  const transferListed = playerIndex >= 13 && ((seed + teamIndex) % 4 === 0 || happiness <= 58 || contractYears <= 1)
+  const askingPrice = transferListed
+    ? Math.max(300_000, Math.round(releaseClause * (0.72 + (seed % 16) / 100)))
+    : releaseClause
 
   return {
     id: `${team.id}-p${playerIndex + 1}`,
     name: playerName,
+    age: buildRealisticPlayerAge(seed, position, overall, playerIndex, team.division, playerName),
     position,
     naturalPositions,
     overall,
-    value: Math.round(overall * overall * 14_500),
-    wage: Math.round(overall * 12_000 + (seed % 90_000)),
+    value,
+    wage,
+    releaseClause,
+    transferListed,
+    askingPrice,
+    happiness,
     stamina: 72 + (seed % 24),
     form: 63 + ((seed >> 3) % 30),
     fatigue: 18 + (seed % 20),
     injuryWeeks: 0,
     suspensionWeeks: 0,
     yellowCards: 0,
-    contractYears: 1 + (seed % 5),
+    contractYears,
+    recentMinutes: [],
   }
 }
 
