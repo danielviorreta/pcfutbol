@@ -81,6 +81,7 @@ interface GameContextValue {
 }
 
 const GameContext = createContext<GameContextValue | null>(null)
+const DEFAULT_SEASON_START_YEAR = 2025
 
 function getManagerTeam(game: ManagerGameState | null): Team | null {
   if (!game) {
@@ -101,6 +102,7 @@ function buildGame(input: CreateGameInput): ManagerGameState {
     saveName: input.saveName.trim() || `${input.managerName.trim() || 'Mister'} - ${managerTeam.name}`,
     createdAt: now,
     updatedAt: now,
+    seasonStartYear: DEFAULT_SEASON_START_YEAR,
     managerName: input.managerName.trim() || 'Mister',
     managerTeamId: managerTeam.id,
     managerLineup: getDefaultLineup(managerTeam),
@@ -616,6 +618,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         managerTeamId: prev.managerTeamId,
         managerLineup: prev.managerLineup,
       })
+      const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
       const { nextState, headlines } = applyWeeklyClubManagement(simulatedState)
       const withWeeklyNews = {
@@ -628,6 +631,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return {
         ...prev,
+        seasonStartYear: seasonRolledOver ? prev.seasonStartYear + 1 : prev.seasonStartYear,
         leagueState: withWeeklyNews,
         managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
       }
@@ -688,6 +692,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       managerTeamId: game.managerTeamId,
       managerLineup: game.managerLineup,
     })
+    const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
     const { nextState, headlines } = applyWeeklyClubManagement(simulatedState)
     const withWeeklyNews = {
@@ -701,6 +706,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const nextGame: ManagerGameState = {
       ...game,
       updatedAt: new Date().toISOString(),
+      seasonStartYear: seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
       leagueState: withWeeklyNews,
       managerLineup: normalizeLineup(nextManagerTeam, game.managerLineup),
     }

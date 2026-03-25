@@ -10,6 +10,11 @@ import { useGame } from './state/gameState'
 import { ClubBadge } from './components/ClubBadge'
 import './App.css'
 
+function formatSeasonLabel(startYear: number): string {
+  const nextShortYear = String((startYear + 1) % 100).padStart(2, '0')
+  return `${startYear}/${nextShortYear}`
+}
+
 function App() {
   const { game, setManagerName, setSaveName, clearNotice, notice, managerTeam } = useGame()
 
@@ -17,7 +22,7 @@ function App() {
     <main className="game-shell">
       <header className="top-bar">
         <div>
-          <p className="eyebrow">Temporada 1996/97 - Modo Carrera</p>
+          <p className="eyebrow">Temporada {formatSeasonLabel(game?.seasonStartYear ?? 2025)} - Modo Carrera</p>
           <h1>PCFutbol Legacy</h1>
         </div>
         {game && managerTeam ? (

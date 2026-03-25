@@ -232,6 +232,7 @@ export interface ManagerGameState {
   saveName: string
   createdAt: string
   updatedAt: string
+  seasonStartYear: number
   managerName: string
   managerTeamId: string
   managerLineup: string[]

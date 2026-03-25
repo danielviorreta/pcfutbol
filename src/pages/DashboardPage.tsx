@@ -20,6 +20,11 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
+function formatSeasonLabel(startYear: number): string {
+  const nextShortYear = String((startYear + 1) % 100).padStart(2, '0')
+  return `${startYear}/${nextShortYear}`
+}
+
 function teamName(teamId: string, teams: { id: string; name: string }[]): string {
   return teams.find((team) => team.id === teamId)?.name ?? teamId
 }
@@ -104,6 +109,7 @@ export function DashboardPage() {
           Bienvenido, <strong>{managerName || 'Mister'}</strong>. Diriges a{' '}
           <strong>{managerTeam.name}</strong>.
         </p>
+        <p>Temporada actual: <strong>{formatSeasonLabel(game.seasonStartYear)}</strong></p>
         <p>Division: {managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</p>
         <p>
           Jornada {Math.min(leagueState.currentRound, leagueState.totalRounds)} de{' '}

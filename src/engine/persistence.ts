@@ -7,6 +7,7 @@ interface SaveStorage {
 
 const STORAGE_KEY = 'pcfutbol-legacy-saves'
 const LEGACY_STORAGE_KEY = 'pcfutbol-legacy-save'
+const DEFAULT_SEASON_START_YEAR = 2025
 
 const SEGUNDA_REGIONAL_GROUPS: Record<string, 'Grupo 1' | 'Grupo 2'> = {
   lev: 'Grupo 2',
@@ -64,6 +65,7 @@ function makeMigratedLegacyGame(legacy: Partial<ManagerGameState>): ManagerGameS
     saveName: `${legacy.managerName} - ${managerTeam?.name ?? 'Carrera'}`,
     createdAt: now,
     updatedAt: now,
+    seasonStartYear: DEFAULT_SEASON_START_YEAR,
     managerName: legacy.managerName,
     managerTeamId: legacy.managerTeamId,
     managerLineup: legacy.managerLineup,
@@ -81,6 +83,10 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
 
   return {
     ...game,
+    seasonStartYear:
+      typeof (game as Partial<ManagerGameState>).seasonStartYear === 'number'
+        ? (game as Partial<ManagerGameState>).seasonStartYear as number
+        : DEFAULT_SEASON_START_YEAR,
     leagueState: {
       ...game.leagueState,
       promotionSummary: game.leagueState.promotionSummary ?? [],
