@@ -1,3 +1,4 @@
+import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
 import type { GameSummary, ManagerGameState } from '../types/game'
 
 interface SaveStorage {
@@ -69,6 +70,8 @@ function makeMigratedLegacyGame(legacy: Partial<ManagerGameState>): ManagerGameS
     managerName: legacy.managerName,
     managerTeamId: legacy.managerTeamId,
     managerLineup: legacy.managerLineup,
+    pendingTransferOffers: [],
+    pendingRenewalOffers: [],
     leagueState: legacy.leagueState,
   }
 }
@@ -87,6 +90,12 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
       typeof (game as Partial<ManagerGameState>).seasonStartYear === 'number'
         ? (game as Partial<ManagerGameState>).seasonStartYear as number
         : DEFAULT_SEASON_START_YEAR,
+    pendingTransferOffers: Array.isArray((game as Partial<ManagerGameState>).pendingTransferOffers)
+      ? (game as Partial<ManagerGameState>).pendingTransferOffers ?? []
+      : [],
+    pendingRenewalOffers: Array.isArray((game as Partial<ManagerGameState>).pendingRenewalOffers)
+      ? (game as Partial<ManagerGameState>).pendingRenewalOffers ?? []
+      : [],
     leagueState: {
       ...game.leagueState,
       promotionSummary: game.leagueState.promotionSummary ?? [],
@@ -109,6 +118,43 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
         players: team.players.map((player) => ({
           ...player,
           yellowCards: player.yellowCards ?? 0,
+          happiness:
+            typeof player.happiness === 'number'
+              ? player.happiness
+              : estimatePlayerHappiness(team, player.contractYears ?? 3),
+          releaseClause:
+            typeof player.releaseClause === 'number'
+              ? player.releaseClause
+              : estimateReleaseClause(
+                {
+                  value: player.value,
+                  overall: player.overall,
+                  wage: player.wage,
+                  contractYears: player.contractYears ?? 3,
+                },
+                team,
+                typeof player.happiness === 'number'
+                  ? player.happiness
+                  : estimatePlayerHappiness(team, player.contractYears ?? 3),
+              ),
+          transferListed: Boolean((player as Partial<typeof player>).transferListed),
+          askingPrice:
+            typeof (player as Partial<typeof player>).askingPrice === 'number'
+              ? Math.max(100_000, Math.round((player as Partial<typeof player>).askingPrice as number))
+              : typeof player.releaseClause === 'number'
+                ? player.releaseClause
+                : estimateReleaseClause(
+                  {
+                    value: player.value,
+                    overall: player.overall,
+                    wage: player.wage,
+                    contractYears: player.contractYears ?? 3,
+                  },
+                  team,
+                  typeof player.happiness === 'number'
+                    ? player.happiness
+                    : estimatePlayerHappiness(team, player.contractYears ?? 3),
+                ),
         })),
       })),
     },

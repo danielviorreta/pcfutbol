@@ -19,15 +19,21 @@ export type Tactic = '4-3-3' | '4-4-2' | '5-4-1'
 export type TrainingFocus = 'fitness' | 'attack' | 'midfield' | 'defense'
 export type Division = 'Primera' | 'Segunda' | 'Primera Federacion'
 export type CompetitionGroup = 'Grupo 1' | 'Grupo 2'
+export type PromisedRole = 'estrella' | 'titular' | 'rotacion' | 'banquillo'
 
 export interface Player {
   id: string
   name: string
+  age?: number
   position: Position
   naturalPositions?: RolePosition[]
   overall: number
   value: number
   wage: number
+  releaseClause: number
+  transferListed: boolean
+  askingPrice: number
+  happiness: number
   stamina: number
   form: number
   fatigue: number
@@ -35,6 +41,7 @@ export interface Player {
   suspensionWeeks: number
   yellowCards: number
   contractYears: number
+  recentMinutes?: number[]
 }
 
 export interface YouthPlayer {
@@ -111,6 +118,31 @@ export interface MatchResult {
   awayTeamId: string
   homeGoals: number
   awayGoals: number
+}
+
+export interface PendingRenewalOffer {
+  id: string
+  playerId: string
+  playerName: string
+  wageOffer: number
+  contractYears: number
+  signingBonus: number
+  createdRound: number
+}
+
+export interface IncomingTransferOffer {
+  id: string
+  buyerTeamId: string
+  buyerTeamName: string
+  playerId: string
+  playerName: string
+  transferFee: number
+  releaseClause: number
+  wageOffer: number
+  signingBonus: number
+  contractYears: number
+  promisedRole: PromisedRole
+  createdRound: number
 }
 
 export interface MatchPresentation {
@@ -236,6 +268,8 @@ export interface ManagerGameState {
   managerName: string
   managerTeamId: string
   managerLineup: string[]
+  pendingTransferOffers: IncomingTransferOffer[]
+  pendingRenewalOffers: PendingRenewalOffer[]
   leagueState: LeagueState
 }
 
@@ -254,5 +288,14 @@ export interface TransferTarget {
   player: Player
   sellerTeamId: string
   sellerTeamName: string
-  askingPrice: number
+  sellerDivision: Division
+  sellerGroup?: CompetitionGroup
+  marketPrice: number
+  isTransferListed: boolean
+  releaseClause: number
+  recommendedWage: number
+  recommendedSigningBonus: number
+  recommendedContractYears: number
+  recommendedPromisedRole: PromisedRole
+  interestLabel: string
 }

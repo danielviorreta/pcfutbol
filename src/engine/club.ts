@@ -1,5 +1,7 @@
 import { buildSeasonFixtures } from '../data/seedData'
-import type { LeagueState, PlayoffTie, Position, Tactic, Team, TrainingFocus } from '../types/game'
+import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
+import { simulateAiContractRenewals, simulateAiTransferWindow } from './transfers'
+import type { IncomingTransferOffer, LeagueState, PendingRenewalOffer, Player, PlayoffTie, Position, PromisedRole, Tactic, Team, TrainingFocus } from '../types/game'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -7,6 +9,80 @@ function clamp(value: number, min: number, max: number): number {
 
 function weeklyPayroll(team: Team): number {
   return team.players.reduce((sum, player) => sum + player.wage, 0) / 52
+}
+
+function estimatePlayerAge(player: Player): number {
+  if (typeof player.age === 'number' && Number.isFinite(player.age)) {
+    return clamp(Math.round(player.age), 16, 40)
+  }
+
+  // Fallback when legacy saves do not store age in first-team players.
+  if (player.overall >= 88) return 29
+  if (player.overall >= 84) return 27
+  if (player.overall >= 79) return 25
+  if (player.overall >= 73) return 23
+  return 21
+}
+
+function estimateSquadRole(team: Team, playerId: string): PromisedRole {
+  const ordered = team.players
+    .slice()
+    .sort((a, b) => b.overall - a.overall)
+    .map((item) => item.id)
+
+  const index = ordered.indexOf(playerId)
+  if (index < 0) return 'rotacion'
+  if (index <= 2) return 'estrella'
+  if (index <= 10) return 'titular'
+  if (index <= 17) return 'rotacion'
+  return 'banquillo'
+}
+
+function estimateRecentMinutesShare(team: Team, player: Player, role: PromisedRole): number {
+  if (Array.isArray(player.recentMinutes) && player.recentMinutes.length > 0) {
+    const sample = player.recentMinutes.slice(-5)
+    const avg = sample.reduce((sum, value) => sum + value, 0) / sample.length
+    return Math.min(0.98, Math.max(0.02, avg / 90))
+  }
+
+  if (player.injuryWeeks > 0 || player.suspensionWeeks > 0) {
+    return 0.02
+  }
+
+  const roleBase = role === 'estrella'
+    ? 0.92
+    : role === 'titular'
+      ? 0.78
+      : role === 'rotacion'
+        ? 0.46
+        : 0.18
+
+  const fitnessMod = player.fatigue >= 80
+    ? -0.20
+    : player.fatigue >= 65
+      ? -0.12
+      : player.fatigue <= 30
+        ? 0.05
+        : 0
+
+  const formMod = player.form >= 85
+    ? 0.08
+    : player.form >= 75
+      ? 0.04
+      : player.form <= 58
+        ? -0.08
+        : 0
+
+  const overallGap = team.players.length > 0
+    ? Math.max(...team.players.map((p) => p.overall)) - player.overall
+    : 0
+  const qualityMod = overallGap <= 2
+    ? 0.04
+    : overallGap >= 10
+      ? -0.06
+      : 0
+
+  return Math.min(0.98, Math.max(0.02, roleBase + fitnessMod + formMod + qualityMod))
 }
 
 function applyTrainingToTeam(team: Team): Team {
@@ -338,7 +414,9 @@ function applyPromotionRelegation(teams: Team[]): { teams: Team[]; headlines: st
 
 export function applyWeeklyClubManagement(
   state: LeagueState,
-): { nextState: LeagueState; headlines: string[] } {
+  managerTeamId: string,
+  existingIncomingOffers: IncomingTransferOffer[] = [],
+): { nextState: LeagueState; headlines: string[]; incomingOffers: IncomingTransferOffer[] } {
   const standings = buildStandingsIndex(state.teams)
   const isSeasonOver = state.currentRound > state.totalRounds
   const midSeasonRound = Math.floor(state.totalRounds / 2)
@@ -409,12 +487,30 @@ export function applyWeeklyClubManagement(
     }
   })
 
+  let managedState: LeagueState = {
+    ...state,
+    teams: nextTeams,
+  }
+  let incomingOffers: IncomingTransferOffer[] = []
+
   return {
     nextState: (() => {
       if (!isSeasonOver) {
+        const renewedState = simulateAiContractRenewals(managedState, managerTeamId)
+        headlines.push(...renewedState.headlines)
+        managedState = renewedState.nextState
+
+        const aiWindow = simulateAiTransferWindow(
+          managedState,
+          managerTeamId,
+          existingIncomingOffers,
+        )
+        headlines.push(...aiWindow.headlines)
+        incomingOffers = aiWindow.incomingOffers
+        managedState = aiWindow.nextState
+
         return {
-          ...state,
-          teams: nextTeams,
+          ...managedState,
         }
       }
 
@@ -436,6 +532,7 @@ export function applyWeeklyClubManagement(
       }
     })(),
     headlines,
+    incomingOffers,
   }
 }
 
@@ -628,58 +725,191 @@ export function upgradeStadium(
   }
 }
 
-export function renewPlayerContract(
+export function submitRenewalOffer(
   state: LeagueState,
   managerTeamId: string,
   playerId: string,
-): { nextState: LeagueState; message: string; ok: boolean } {
+  wageOffer: number,
+  contractYears: number,
+): { offer: PendingRenewalOffer | null; message: string; ok: boolean } {
   const team = state.teams.find((item) => item.id === managerTeamId)
   const player = team?.players.find((item) => item.id === playerId)
 
   if (!team || !player) {
-    return { nextState: state, message: 'Jugador no encontrado.', ok: false }
+    return { offer: null, message: 'Jugador no encontrado.', ok: false }
   }
 
-  const signingBonus = Math.round(player.wage * 8)
+  const nextWage = Number.isFinite(wageOffer) && wageOffer > 0
+    ? Math.round(wageOffer)
+    : Math.round(player.wage * 1.08)
 
-  if (team.budget < signingBonus) {
+  const nextYears = Number.isFinite(contractYears) && contractYears >= 1 && contractYears <= 6
+    ? Math.round(contractYears)
+    : clamp(player.contractYears + 2, 1, 6)
+
+  const wageRatio = nextWage / Math.max(player.wage, 1)
+  if (wageRatio < 0.92) {
     return {
-      nextState: state,
-      message: 'No hay presupuesto para renovar el contrato.',
+      offer: null,
+      message: `${player.name} no aceptará una rebaja salarial importante.`,
       ok: false,
     }
   }
 
-  const nextTeams = state.teams.map((item) => {
-    if (item.id !== managerTeamId) {
-      return item
-    }
-
+  const signingBonus = Math.round(nextWage * (nextYears >= 4 ? 5 : 3))
+  if (team.budget < signingBonus) {
     return {
-      ...item,
-      budget: item.budget - signingBonus,
-      players: item.players.map((candidate) =>
-        candidate.id === playerId
-          ? {
-              ...candidate,
-              contractYears: clamp(candidate.contractYears + 2, 1, 6),
-              wage: Math.round(candidate.wage * 1.08),
-            }
-          : candidate,
-      ),
+      offer: null,
+      message: `No hay presupuesto suficiente para la prima de firma (${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(signingBonus)}).`,
+      ok: false,
     }
-  })
+  }
+
+  const offer: PendingRenewalOffer = {
+    id: `renewal-${playerId}-${state.currentRound}`,
+    playerId,
+    playerName: player.name,
+    wageOffer: nextWage,
+    contractYears: nextYears,
+    signingBonus,
+    createdRound: state.currentRound,
+  }
 
   return {
-    nextState: {
-      ...state,
-      teams: nextTeams,
-      news: [`Renovado: ${player.name} firma dos temporadas mas.`, ...state.news].slice(0, 12),
-    },
-    message: `Contrato renovado para ${player.name}.`,
+    offer,
+    message: `Oferta de renovación enviada a ${player.name}. Responderá en la próxima jornada.`,
     ok: true,
   }
 }
+
+function playerAcceptsRenewal(team: Team, player: Player, wageRatio: number, contractYears: number): boolean {
+  const age = estimatePlayerAge(player)
+  const role = estimateSquadRole(team, player.id)
+  const recentMinutesShare = estimateRecentMinutesShare(team, player, role)
+
+  let chance = 0.50
+  if (wageRatio >= 1.20) chance = 0.94
+  else if (wageRatio >= 1.15) chance = 0.87
+  else if (wageRatio >= 1.08) chance = 0.76
+  else if (wageRatio >= 1.00) chance = 0.63
+  else chance = 0.42 // 0.92-1.00: risky
+
+  if (player.happiness >= 75) chance += 0.08
+  else if (player.happiness < 45) chance -= 0.15
+
+  if (contractYears >= 4) chance += 0.03
+
+  if (age <= 22) {
+    chance -= 0.03
+    if (wageRatio >= 1.12) chance += 0.04
+  } else if (age >= 30 && age <= 33) {
+    chance += contractYears >= 3 ? 0.05 : 0.01
+  } else if (age >= 34) {
+    chance += contractYears <= 2 ? 0.06 : -0.10
+  }
+
+  if (player.overall >= 86) chance -= 0.08
+  else if (player.overall >= 80) chance -= 0.04
+  else if (player.overall <= 70) chance += 0.05
+
+  if (role === 'estrella') {
+    chance += wageRatio >= 1.10 ? 0.05 : -0.10
+  } else if (role === 'titular') {
+    chance += wageRatio >= 1.05 ? 0.03 : -0.04
+  } else if (role === 'banquillo') {
+    chance += wageRatio >= 1.00 ? 0.07 : -0.03
+  }
+
+  if (recentMinutesShare < 0.20) {
+    chance += wageRatio >= 1.15 ? 0.05 : -0.14
+  } else if (recentMinutesShare < 0.40) {
+    chance += wageRatio >= 1.10 ? 0.03 : -0.08
+  } else if (recentMinutesShare > 0.82) {
+    chance += 0.04
+  }
+
+  return Math.random() < Math.min(0.97, Math.max(0.05, chance))
+}
+
+export function resolveRenewalOffers(
+  state: LeagueState,
+  managerTeamId: string,
+  pendingOffers: PendingRenewalOffer[],
+): { nextState: LeagueState; messages: string[]; resolvedIds: string[] } {
+  const dueOffers = pendingOffers.filter((offer) => offer.createdRound < state.currentRound)
+  if (dueOffers.length === 0) {
+    return { nextState: state, messages: [], resolvedIds: [] }
+  }
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+
+  const messages: string[] = []
+  const resolvedIds: string[] = []
+  let currentState = state
+
+  for (const offer of dueOffers) {
+    resolvedIds.push(offer.id)
+    const currentTeam = currentState.teams.find((t) => t.id === managerTeamId)
+    const player = currentTeam?.players.find((p) => p.id === offer.playerId)
+
+    if (!currentTeam || !player) {
+      messages.push(`${offer.playerName} ya no está en el equipo. Renovación cancelada.`)
+      continue
+    }
+
+    if (currentTeam.budget < offer.signingBonus) {
+      messages.push(`${player.name} no puede renovar: presupuesto insuficiente para la prima.`)
+      continue
+    }
+
+    const wageRatio = offer.wageOffer / Math.max(player.wage, 1)
+    if (!playerAcceptsRenewal(currentTeam, player, wageRatio, offer.contractYears)) {
+      messages.push(`${player.name} rechaza la oferta de renovación.`)
+      continue
+    }
+
+    const happinessDelta = wageRatio >= 1.15 ? 10 : wageRatio >= 1.05 ? 6 : 3
+    const nextHappiness = clamp(player.happiness + happinessDelta, 35, 99)
+
+    currentState = {
+      ...currentState,
+      news: [
+        `Renovado: ${player.name} firma ${offer.contractYears} temporada${offer.contractYears === 1 ? '' : 's'} más.`,
+        ...currentState.news,
+      ].slice(0, 12),
+      teams: currentState.teams.map((t) => {
+        if (t.id !== managerTeamId) return t
+        return {
+          ...t,
+          budget: t.budget - offer.signingBonus,
+          players: t.players.map((p) =>
+            p.id === offer.playerId
+              ? {
+                  ...p,
+                  contractYears: offer.contractYears,
+                  wage: offer.wageOffer,
+                  happiness: nextHappiness,
+                  releaseClause: estimateReleaseClause(
+                    { value: p.value, overall: p.overall, wage: offer.wageOffer, contractYears: offer.contractYears },
+                    t,
+                    nextHappiness,
+                  ),
+                }
+              : p,
+          ),
+        }
+      }),
+    }
+
+    messages.push(
+      `${player.name} acepta la renovación: ${offer.contractYears} año${offer.contractYears === 1 ? '' : 's'} · ${fmt(offer.wageOffer)}/sem · Prima: ${fmt(offer.signingBonus)}.`,
+    )
+  }
+
+  return { nextState: currentState, messages, resolvedIds }
+}
+
 
 export function promoteYouthPlayer(
   state: LeagueState,
@@ -704,10 +934,15 @@ export function promoteYouthPlayer(
   const promoted = {
     id: `${team.id}-p-${youth.id}`,
     name: youth.name,
+    age: youth.age,
     position: youth.position,
     overall: youth.overall,
     value: Math.round(youth.overall * youth.overall * 13_500),
     wage: Math.round(130_000 + youth.overall * 3200),
+    releaseClause: 0,
+    transferListed: false,
+    askingPrice: 0,
+    happiness: estimatePlayerHappiness(team, 3, 6),
     stamina: 74,
     form: 68,
     fatigue: 18,
@@ -715,7 +950,10 @@ export function promoteYouthPlayer(
     suspensionWeeks: 0,
     yellowCards: 0,
     contractYears: 3,
+    recentMinutes: [],
   }
+  promoted.releaseClause = estimateReleaseClause(promoted, team, promoted.happiness)
+  promoted.askingPrice = promoted.releaseClause
 
   const nextTeams = state.teams.map((item) => {
     if (item.id !== managerTeamId) {

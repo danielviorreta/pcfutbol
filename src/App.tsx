@@ -3,8 +3,10 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ClubPage } from './pages/ClubPage'
 import { GamesPage } from './pages/GamesPage'
 import { MatchDayPage } from './pages/MatchDayPage'
+import { PlayerManagementPage } from './pages/PlayerManagementPage'
 import { PromotionPage } from './pages/PromotionPage'
 import { SquadPage } from './pages/SquadPage'
+import { TransferOfferPage } from './pages/TransferOfferPage'
 import { TransfersPage } from './pages/TransfersPage'
 import { useGame } from './state/gameState'
 import { ClubBadge } from './components/ClubBadge'
@@ -87,8 +89,10 @@ function App() {
         <Route path="/matchday" element={game ? <MatchDayPage /> : <Navigate to="/games" replace />} />
         <Route path="/squad" element={game ? <SquadPage /> : <Navigate to="/games" replace />} />
         <Route path="/club" element={game ? <ClubPage /> : <Navigate to="/games" replace />} />
+        <Route path="/club/player/:playerId" element={game ? <PlayerManagementPage /> : <Navigate to="/games" replace />} />
         <Route path="/promotions" element={game ? <PromotionPage /> : <Navigate to="/games" replace />} />
         <Route path="/transfers" element={game ? <TransfersPage /> : <Navigate to="/games" replace />} />
+        <Route path="/transfers/offer/:playerId" element={game ? <TransferOfferPage /> : <Navigate to="/games" replace />} />
       </Routes>
     </main>
   )

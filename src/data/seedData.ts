@@ -10,6 +10,7 @@ import type {
   TrainingFocus,
   YouthPlayer,
 } from '../types/game'
+import { estimatePlayerHappiness, estimateReleaseClause } from '../engine/playerMarket'
 
 type TeamSeed = Omit<
   Team,
@@ -1557,22 +1558,37 @@ function buildPlayer(team: TeamSeedWithDivision, teamIndex: number, playerIndex:
     : lowerDivisionFallbackRealNames[(seed + teamIndex * 17 + playerIndex * 13) % lowerDivisionFallbackRealNames.length]
   const playerName = roster?.name ?? fallbackName
   const naturalPositions = inferNaturalPositions(position, playerIndex)
+  const value = Math.round(overall * overall * 14_500)
+  const wage = Math.round(overall * 12_000 + (seed % 90_000))
+  const contractYears = 1 + (seed % 5)
+  const happiness = estimatePlayerHappiness(team, contractYears, ((seed % 11) - 5) * 2)
+  const releaseClause = estimateReleaseClause({ value, wage, overall, contractYears }, team, happiness)
+  const transferListed = playerIndex >= 13 && ((seed + teamIndex) % 4 === 0 || happiness <= 58 || contractYears <= 1)
+  const askingPrice = transferListed
+    ? Math.max(300_000, Math.round(releaseClause * (0.72 + (seed % 16) / 100)))
+    : releaseClause
 
   return {
     id: `${team.id}-p${playerIndex + 1}`,
     name: playerName,
+    age: 18 + (seed % 18),
     position,
     naturalPositions,
     overall,
-    value: Math.round(overall * overall * 14_500),
-    wage: Math.round(overall * 12_000 + (seed % 90_000)),
+    value,
+    wage,
+    releaseClause,
+    transferListed,
+    askingPrice,
+    happiness,
     stamina: 72 + (seed % 24),
     form: 63 + ((seed >> 3) % 30),
     fatigue: 18 + (seed % 20),
     injuryWeeks: 0,
     suspensionWeeks: 0,
     yellowCards: 0,
-    contractYears: 1 + (seed % 5),
+    contractYears,
+    recentMinutes: [],
   }
 }
 

@@ -4,7 +4,8 @@ import { createInitialLeagueState } from '../data/seedData'
 import {
   applyWeeklyClubManagement,
   promoteYouthPlayer,
-  renewPlayerContract,
+  resolveRenewalOffers,
+  submitRenewalOffer,
   setStadiumTicketPrice,
   setTeamTactic,
   setTeamTrainingFocus,
@@ -22,9 +23,10 @@ import {
   isPlayerAvailable,
   normalizeLineup,
 } from '../engine/squad'
-import { buyPlayer, getTransferTargets } from '../engine/transfers'
+import { acceptIncomingTransferOffer, buyPlayer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
 import type {
   GameSummary,
+  IncomingTransferOffer,
   MatchCommentaryEvent,
   MatchGoalRecord,
   MatchIncidentRecord,
@@ -33,7 +35,9 @@ import type {
   MatchSubstitutionRecord,
   MatchTacticalChangeRecord,
   ManagerGameState,
+  PendingRenewalOffer,
   Player,
+  PromisedRole,
   Tactic,
   Team,
   TrainingFocus,
@@ -52,6 +56,8 @@ interface GameContextValue {
   matchPresentation: MatchPresentation | null
   table: Team[]
   transferTargets: TransferTarget[]
+  pendingTransferOffers: IncomingTransferOffer[]
+  pendingRenewalOffers: PendingRenewalOffer[]
   savedGames: GameSummary[]
   notice: string | null
   setManagerName: (value: string) => void
@@ -67,11 +73,16 @@ interface GameContextValue {
   toggleLineupPlayer: (playerId: string) => void
   setLineupSlotPlayer: (slotIndex: number, playerId: string) => void
   autoPickLineup: () => void
-  purchasePlayer: (playerId: string) => void
+  purchasePlayer: (playerId: string, wageOffer: number, signingBonus: number, contractYears: number, promisedRole: PromisedRole, feeOffer?: number) => void
+  listPlayerForTransfer: (playerId: string, askingPrice: number) => void
+  removePlayerFromTransferList: (playerId: string) => void
+  acceptTransferOffer: (offerId: string) => void
+  rejectTransferOffer: (offerId: string) => void
   saveCurrentGame: () => void
   setTrainingFocus: (focus: TrainingFocus) => void
   setTactic: (tactic: Tactic) => void
-  renewContract: (playerId: string) => void
+  renewContract: (playerId: string, wageOffer?: number, contractYears?: number) => void
+  cancelRenewalOffer: (offerId: string) => void
   promoteYouth: (youthId: string) => void
   setTicketPrice: (price: number) => void
   upgradeStadium: () => void
@@ -106,8 +117,35 @@ function buildGame(input: CreateGameInput): ManagerGameState {
     managerName: input.managerName.trim() || 'Mister',
     managerTeamId: managerTeam.id,
     managerLineup: getDefaultLineup(managerTeam),
+    pendingTransferOffers: [],
+    pendingRenewalOffers: [],
     leagueState,
   }
+}
+
+function mergeIncomingOffers(
+  currentOffers: IncomingTransferOffer[],
+  nextOffers: IncomingTransferOffer[],
+  managerTeam: Team | null,
+  currentRound: number,
+): IncomingTransferOffer[] {
+  const managerPlayerIds = new Set(managerTeam?.players.map((player) => player.id) ?? [])
+  const merged = [...currentOffers, ...nextOffers]
+  const deduped = new Map<string, IncomingTransferOffer>()
+
+  merged.forEach((offer) => {
+    if (!managerPlayerIds.has(offer.playerId)) {
+      return
+    }
+
+    if (currentRound - offer.createdRound > 2) {
+      return
+    }
+
+    deduped.set(`${offer.buyerTeamId}:${offer.playerId}`, offer)
+  })
+
+  return [...deduped.values()]
 }
 
 function getCurrentManagerFixture(game: ManagerGameState) {
@@ -549,7 +587,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     )
   }, [game])
   const transferTargets = useMemo(
-    () => (game ? getTransferTargets(game.leagueState, game.managerTeamId) : []),
+    () => (game ? getTransferTargets(game.leagueState, game.managerTeamId, Number.MAX_SAFE_INTEGER) : []),
     [game],
   )
   const savedGames = useMemo(() => toGameSummaries(games), [games])
@@ -620,23 +658,47 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       })
       const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
-      const { nextState, headlines } = applyWeeklyClubManagement(simulatedState)
+      const { nextState, headlines, incomingOffers } = applyWeeklyClubManagement(
+        simulatedState,
+        prev.managerTeamId,
+        prev.pendingTransferOffers,
+      )
       const withWeeklyNews = {
         ...nextState,
         news: [...headlines, ...nextState.news].slice(0, 12),
       }
 
+      const { nextState: afterRenewals, messages: renewalMessages, resolvedIds } = resolveRenewalOffers(
+        withWeeklyNews,
+        prev.managerTeamId,
+        prev.pendingRenewalOffers ?? [],
+      )
+
       const nextManagerTeam =
-        withWeeklyNews.teams.find((team) => team.id === prev.managerTeamId) ?? withWeeklyNews.teams[0]
+        afterRenewals.teams.find((team) => team.id === prev.managerTeamId) ?? afterRenewals.teams[0]
+      const pendingTransferOffers = mergeIncomingOffers(
+        prev.pendingTransferOffers,
+        incomingOffers,
+        nextManagerTeam,
+        afterRenewals.currentRound,
+      )
+
+      if (renewalMessages.length > 0) {
+        setNotice(renewalMessages.join(' | '))
+      }
 
       return {
         ...prev,
         seasonStartYear: seasonRolledOver ? prev.seasonStartYear + 1 : prev.seasonStartYear,
-        leagueState: withWeeklyNews,
+        leagueState: afterRenewals,
+        pendingTransferOffers,
+        pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
         managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
       }
     })
-    setNotice('Jornada completada. Partida guardada automaticamente.')
+    if (!game?.pendingRenewalOffers?.length) {
+      setNotice('Jornada completada. Partida guardada automaticamente.')
+    }
   }
 
   const prepareMatchPresentation = (): boolean => {
@@ -695,20 +757,38 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
     const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
-    const { nextState, headlines } = applyWeeklyClubManagement(simulatedState)
+    const { nextState, headlines, incomingOffers } = applyWeeklyClubManagement(
+      simulatedState,
+      game.managerTeamId,
+      game.pendingTransferOffers,
+    )
     const withWeeklyNews = {
       ...nextState,
       news: [...headlines, ...nextState.news].slice(0, 12),
     }
 
+    const { nextState: afterRenewals, messages: renewalMessages, resolvedIds } = resolveRenewalOffers(
+      withWeeklyNews,
+      game.managerTeamId,
+      game.pendingRenewalOffers ?? [],
+    )
+
     const nextManagerTeam =
-      withWeeklyNews.teams.find((team) => team.id === game.managerTeamId) ?? withWeeklyNews.teams[0]
+      afterRenewals.teams.find((team) => team.id === game.managerTeamId) ?? afterRenewals.teams[0]
+    const pendingTransferOffers = mergeIncomingOffers(
+      game.pendingTransferOffers,
+      incomingOffers,
+      nextManagerTeam,
+      afterRenewals.currentRound,
+    )
 
     const nextGame: ManagerGameState = {
       ...game,
       updatedAt: new Date().toISOString(),
       seasonStartYear: seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
-      leagueState: withWeeklyNews,
+      leagueState: afterRenewals,
+      pendingTransferOffers,
+      pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
       managerLineup: normalizeLineup(nextManagerTeam, game.managerLineup),
     }
 
@@ -717,11 +797,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     )
 
     persistCollection(nextGames, nextGame.id)
-    setNotice('Jornada completada. Partida guardada automaticamente.')
+    const noticeText = renewalMessages.length > 0
+      ? renewalMessages.join(' | ')
+      : 'Jornada completada. Partida guardada automaticamente.'
+    setNotice(noticeText)
 
-    const result = withWeeklyNews.lastResults.find((item) => item.fixtureId === matchPresentation.fixtureId)
-    const homeTeamAfterMatch = withWeeklyNews.teams.find((team) => team.id === matchPresentation.homeTeamId)
-    const awayTeamAfterMatch = withWeeklyNews.teams.find((team) => team.id === matchPresentation.awayTeamId)
+    const result = afterRenewals.lastResults.find((item) => item.fixtureId === matchPresentation.fixtureId)
+    const homeTeamAfterMatch = afterRenewals.teams.find((team) => team.id === matchPresentation.homeTeamId)
+    const awayTeamAfterMatch = afterRenewals.teams.find((team) => team.id === matchPresentation.awayTeamId)
     const stats = result
       ? buildMatchStats(
         homeTeamBeforeMatch,
@@ -868,9 +951,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const purchasePlayer = (playerId: string) => {
+  const purchasePlayer = (
+    playerId: string,
+    wageOffer: number,
+    signingBonus: number,
+    contractYears: number,
+    promisedRole: PromisedRole,
+    feeOffer?: number,
+  ) => {
     updateActiveGame((prev) => {
-      const { nextState, message, ok } = buyPlayer(prev.leagueState, prev.managerTeamId, playerId)
+      const { nextState, message, ok } = buyPlayer(
+        prev.leagueState,
+        prev.managerTeamId,
+        playerId,
+        wageOffer,
+        signingBonus,
+        contractYears,
+        promisedRole,
+        feeOffer,
+      )
       setNotice(message)
 
       if (!ok) {
@@ -886,6 +985,86 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         managerLineup: normalizeLineup(managerTeamAfterTransfer, prev.managerLineup),
       }
     })
+  }
+
+  const listPlayerForTransfer = (playerId: string, askingPrice: number) => {
+    updateActiveGame((prev) => {
+      const { nextState, message, ok } = setPlayerTransferStatus(
+        prev.leagueState,
+        prev.managerTeamId,
+        playerId,
+        true,
+        askingPrice,
+      )
+      setNotice(message)
+
+      if (!ok) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        leagueState: nextState,
+      }
+    })
+  }
+
+  const removePlayerFromTransferList = (playerId: string) => {
+    updateActiveGame((prev) => {
+      const { nextState, message, ok } = setPlayerTransferStatus(
+        prev.leagueState,
+        prev.managerTeamId,
+        playerId,
+        false,
+      )
+      setNotice(message)
+
+      if (!ok) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        leagueState: nextState,
+      }
+    })
+  }
+
+  const acceptTransferOffer = (offerId: string) => {
+    updateActiveGame((prev) => {
+      const offer = prev.pendingTransferOffers.find((item) => item.id === offerId)
+      if (!offer) {
+        setNotice('La oferta ya no esta disponible.')
+        return prev
+      }
+
+      const { nextState, message, ok } = acceptIncomingTransferOffer(prev.leagueState, offer)
+      setNotice(message)
+
+      if (!ok) {
+        return {
+          ...prev,
+          pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
+        }
+      }
+
+      const nextManagerTeam = nextState.teams.find((team) => team.id === prev.managerTeamId) ?? nextState.teams[0]
+
+      return {
+        ...prev,
+        leagueState: nextState,
+        pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
+        managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
+      }
+    })
+  }
+
+  const rejectTransferOffer = (offerId: string) => {
+    updateActiveGame((prev) => ({
+      ...prev,
+      pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
+    }))
+    setNotice('Oferta rechazada.')
   }
 
   const saveCurrentGame = () => {
@@ -924,19 +1103,38 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setNotice(`Tactica actualizada: ${tactic}.`)
   }
 
-  const renewContract = (playerId: string) => {
+  const renewContract = (playerId: string, wageOffer?: number, contractYears?: number) => {
     updateActiveGame((prev) => {
-      const { nextState, ok, message } = renewPlayerContract(prev.leagueState, prev.managerTeamId, playerId)
+      if ((prev.pendingRenewalOffers ?? []).some((offer) => offer.playerId === playerId)) {
+        setNotice('Ya hay una oferta de renovación pendiente para este jugador.')
+        return prev
+      }
+
+      const { offer, ok, message } = submitRenewalOffer(
+        prev.leagueState,
+        prev.managerTeamId,
+        playerId,
+        wageOffer ?? 0,
+        contractYears ?? 0,
+      )
       setNotice(message)
-      if (!ok) {
+      if (!ok || !offer) {
         return prev
       }
 
       return {
         ...prev,
-        leagueState: nextState,
+        pendingRenewalOffers: [...(prev.pendingRenewalOffers ?? []), offer],
       }
     })
+  }
+
+  const cancelRenewalOffer = (offerId: string) => {
+    updateActiveGame((prev) => ({
+      ...prev,
+      pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter((o) => o.id !== offerId),
+    }))
+    setNotice('Oferta de renovación retirada.')
   }
 
   const promoteYouth = (youthId: string) => {
@@ -1010,6 +1208,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     matchPresentation,
     table,
     transferTargets,
+    pendingTransferOffers: game?.pendingTransferOffers ?? [],
+    pendingRenewalOffers: game?.pendingRenewalOffers ?? [],
     savedGames,
     notice,
     setManagerName,
@@ -1026,10 +1226,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setLineupSlotPlayer,
     autoPickLineup,
     purchasePlayer,
+    listPlayerForTransfer,
+    removePlayerFromTransferList,
+    acceptTransferOffer,
+    rejectTransferOffer,
     saveCurrentGame,
     setTrainingFocus,
     setTactic,
     renewContract,
+    cancelRenewalOffer,
     promoteYouth,
     setTicketPrice,
     upgradeStadium,

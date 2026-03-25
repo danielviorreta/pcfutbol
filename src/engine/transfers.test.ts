@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { buyPlayer, getTransferTargets } from './transfers'
+import { describe, expect, it, vi } from 'vitest'
+import { buyPlayer, getTransferTargets, simulateAiTransferWindow } from './transfers'
 import type { LeagueState, Player, Team } from '../types/game'
 
 function makePlayer(id: string, name: string, overall: number, value: number): Player {
@@ -11,6 +11,10 @@ function makePlayer(id: string, name: string, overall: number, value: number): P
     overall,
     value,
     wage: 1_000_000,
+    releaseClause: Math.round(value * 2),
+    transferListed: false,
+    askingPrice: Math.round(value * 2),
+    happiness: 60,
     stamina: 80,
     form: 70,
     fatigue: 20,
@@ -93,31 +97,42 @@ describe('transfers engine', () => {
 
     expect(targets.map((target) => target.player.id)).toEqual(['a-1', 'b-1', 'a-2'])
     expect(targets.some((target) => target.sellerTeamId === 'mgr')).toBe(false)
+    expect(targets[0].releaseClause).toBe(rivalA.players[0].releaseClause)
+    expect(targets[0].recommendedContractYears).toBeGreaterThanOrEqual(2)
   })
 
   it('transfers player and updates budgets, morale and news on success', () => {
-    const buyer = makeTeam('mgr', 'Manager FC', 12_000_000, [
+    const buyer = makeTeam('mgr', 'Manager FC', 16_000_000, [
       makePlayer('mgr-1', 'Manager Player', 75, 2_000_000),
     ])
+    buyer.division = 'Primera'
+    buyer.attack = 84
+    buyer.midfield = 84
+    buyer.defense = 82
     const sellerPlayer = makePlayer('a-1', 'A Top', 85, 6_000_000)
+    sellerPlayer.happiness = 54
+    sellerPlayer.contractYears = 1
+    sellerPlayer.transferListed = true
+    sellerPlayer.askingPrice = 8_000_000
     const seller = makeTeam('a', 'Rival A', 4_000_000, [sellerPlayer])
 
     const state = makeState([buyer, seller])
-    const result = buyPlayer(state, 'mgr', 'a-1')
+    const signingBonus = 1_000_000
+    const result = buyPlayer(state, 'mgr', 'a-1', 1_350_000, signingBonus, 4, 'titular')
 
     expect(result.ok).toBe(true)
 
     const nextBuyer = result.nextState.teams.find((team) => team.id === 'mgr')!
     const nextSeller = result.nextState.teams.find((team) => team.id === 'a')!
-    const price = Math.round(sellerPlayer.value * 1.15)
+    const price = sellerPlayer.askingPrice
 
     expect(nextBuyer.players.some((player) => player.id === 'a-1')).toBe(true)
     expect(nextSeller.players.some((player) => player.id === 'a-1')).toBe(false)
-    expect(nextBuyer.budget).toBe(buyer.budget - price)
+    expect(nextBuyer.budget).toBe(buyer.budget - price - signingBonus)
     expect(nextSeller.budget).toBe(seller.budget + price)
     expect(nextBuyer.morale).toBe(76)
     expect(nextSeller.morale).toBe(74)
-    expect(result.nextState.news[0]).toContain('Fichaje cerrado: A Top llega a Manager FC.')
+    expect(result.nextState.news[0]).toContain('Mercado: A Top deja Rival A y firma por Manager FC.')
   })
 
   it('rejects transfer when manager budget is insufficient', () => {
@@ -129,10 +144,78 @@ describe('transfers engine', () => {
     ])
 
     const state = makeState([buyer, seller])
-    const result = buyPlayer(state, 'mgr', 'a-1')
+    const result = buyPlayer(state, 'mgr', 'a-1', 1_200_000, 400_000, 3, 'titular')
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('No hay presupuesto suficiente')
     expect(result.nextState).toBe(state)
+  })
+
+  it('rejects transfer when the player does not want to join despite paying the clause', () => {
+    const buyer = makeTeam('mgr', 'Manager FC', 30_000_000, [
+      makePlayer('mgr-1', 'Manager Player', 75, 2_000_000),
+    ])
+    buyer.division = 'Primera Federacion'
+    buyer.attack = 62
+    buyer.midfield = 62
+    buyer.defense = 61
+    buyer.morale = 66
+
+    const sellerPlayer = makePlayer('a-1', 'A Top', 85, 6_000_000)
+    sellerPlayer.happiness = 86
+    sellerPlayer.contractYears = 4
+    const seller = makeTeam('a', 'Rival A', 40_000_000, [sellerPlayer])
+    seller.division = 'Primera'
+    seller.attack = 87
+    seller.midfield = 86
+    seller.defense = 84
+
+    const state = makeState([buyer, seller])
+    const result = buyPlayer(state, 'mgr', 'a-1', 1_050_000, 250_000, 2, 'banquillo')
+
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('rechaza la oferta')
+    expect(result.nextState).toBe(state)
+  })
+
+  it('lets AI clubs complete signings during transfer windows', () => {
+    const manager = makeTeam('mgr', 'Manager FC', 15_000_000, [
+      makePlayer('mgr-1', 'Manager Player', 75, 2_000_000),
+    ])
+    const buyer = makeTeam('buy', 'Buyer FC', 90_000_000, [
+      makePlayer('buy-1', 'Buyer Mid', 76, 4_000_000),
+    ])
+    buyer.division = 'Primera'
+    buyer.attack = 86
+    buyer.midfield = 86
+    buyer.defense = 84
+    const sellerStar = makePlayer('sell-1', 'Sell Star', 84, 8_000_000)
+    sellerStar.happiness = 50
+    sellerStar.contractYears = 1
+    const filler = Array.from({ length: 18 }, (_, index) => makePlayer(`sell-${index + 2}`, `Extra ${index}`, 68, 1_500_000))
+    const seller = makeTeam('sell', 'Seller FC', 8_000_000, [sellerStar, ...filler])
+    seller.division = 'Segunda'
+    seller.attack = 70
+    seller.midfield = 69
+    seller.defense = 68
+
+    const state = makeState([manager, buyer, seller])
+    state.currentRound = 2
+
+    const random = vi.spyOn(Math, 'random')
+    random
+      .mockReturnValueOnce(0.8)
+      .mockReturnValueOnce(0.2)
+      .mockReturnValueOnce(0.3)
+
+    const result = simulateAiTransferWindow(state, 'mgr')
+    random.mockRestore()
+
+    const nextBuyer = result.nextState.teams.find((team) => team.id === 'buy')!
+    const nextSeller = result.nextState.teams.find((team) => team.id === 'sell')!
+
+    expect(result.headlines.length).toBeGreaterThan(0)
+    expect(nextBuyer.players.some((player) => player.id === 'sell-1')).toBe(true)
+    expect(nextSeller.players.some((player) => player.id === 'sell-1')).toBe(false)
   })
 })
