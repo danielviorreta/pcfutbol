@@ -923,8 +923,59 @@ td:nth-child(6) {
 }
 
 .table-row-manager td {
-  background: rgb(128 22 22 / 0.28);
-  box-shadow: inset 0 1px 0 rgb(196 82 82 / 0.3), inset 0 -1px 0 rgb(196 82 82 / 0.3);
+  box-shadow: inset 0 0 0 1px rgb(203 93 93 / 0.45);
+}
+
+.table-row-zone-promotion td {
+  background: rgb(26 94 54 / 0.3);
+}
+
+.table-row-zone-playoff td {
+  background: rgb(122 86 27 / 0.3);
+}
+
+.table-row-zone-relegation td {
+  background: rgb(123 37 37 / 0.32);
+}
+
+.table-row-zone-promotion.table-row-manager td,
+.table-row-zone-playoff.table-row-manager td,
+.table-row-zone-relegation.table-row-manager td {
+  box-shadow: inset 0 0 0 1px rgb(203 93 93 / 0.58), inset 3px 0 0 rgb(255 182 182 / 0.72);
+}
+
+.table-zone-legend {
+  margin: -0.2rem 0 0.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.zone-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+}
+
+.zone-pill.is-promotion {
+  color: #b9f1cb;
+  border-color: rgb(101 197 129 / 0.5);
+  background: rgb(21 79 46 / 0.5);
+}
+
+.zone-pill.is-playoff {
+  color: #ffdca9;
+  border-color: rgb(221 167 93 / 0.5);
+  background: rgb(82 59 17 / 0.5);
+}
+
+.zone-pill.is-relegation {
+  color: #ffbfbd;
+  border-color: rgb(205 97 95 / 0.5);
+  background: rgb(88 29 29 / 0.55);
 }
 
 .fixture-list,

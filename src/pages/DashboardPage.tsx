@@ -207,6 +207,11 @@ export function DashboardPage() {
             1a RFEF G2
           </button>
         </div>
+        <p className="table-zone-legend" aria-label="Leyenda de zonas de clasificacion">
+          <span className="zone-pill is-promotion">Ascenso</span>
+          <span className="zone-pill is-playoff">Playoff</span>
+          <span className="zone-pill is-relegation">Descenso</span>
+        </p>
         <LeagueTable teams={divisionTables[selectedDivision]} managerTeamId={managerTeam.id} />
       </article>
 
