@@ -160,6 +160,7 @@ export function ClubPage() {
           <thead>
             <tr>
               <th>Jugador</th>
+              <th>Edad</th>
               <th>Pos</th>
               <th>GRL</th>
               <th>Forma</th>
@@ -183,6 +184,7 @@ export function ClubPage() {
                 return (
                   <tr key={player.id}>
                     <td>{player.name}</td>
+                    <td>{player.age ?? 'N/D'}</td>
                     <td>{player.position}</td>
                     <td>{player.overall}</td>
                     <td>{player.form}</td>
