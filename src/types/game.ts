@@ -171,6 +171,20 @@ export interface IncomingTransferOffer {
   createdRound: number
 }
 
+export interface PendingOutgoingTransferOffer {
+  id: string
+  playerId: string
+  playerName: string
+  sellerTeamId: string
+  sellerTeamName: string
+  transferFee: number
+  wageOffer: number
+  signingBonus: number
+  contractYears: number
+  promisedRole: PromisedRole
+  createdRound: number
+}
+
 export interface MatchPresentation {
   phase: 'preview' | 'result'
   round: number
@@ -297,6 +311,7 @@ export interface ManagerGameState {
   managerSquadOrder: string[]
   financeEntries: FinanceEntry[]
   pendingTransferOffers: IncomingTransferOffer[]
+  pendingOutgoingTransfers: PendingOutgoingTransferOffer[]
   pendingRenewalOffers: PendingRenewalOffer[]
   leagueState: LeagueState
 }
@@ -323,6 +338,7 @@ export interface TransferTarget {
   releaseClause: number
   recommendedWage: number
   recommendedSigningBonus: number
+  minimumSigningBonus: number
   recommendedContractYears: number
   recommendedPromisedRole: PromisedRole
   interestLabel: string

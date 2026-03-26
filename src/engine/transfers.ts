@@ -234,6 +234,7 @@ export function getTransferTargets(
           releaseClause: player.releaseClause,
           recommendedWage: preview.requiredWage,
           recommendedSigningBonus: preview.requiredSigningBonus,
+          minimumSigningBonus: Math.ceil(preview.requiredSigningBonus * 0.85),
           recommendedContractYears: preview.suggestedContractYears,
           recommendedPromisedRole: preview.suggestedPromisedRole,
           interestLabel: preview.interestLabel,

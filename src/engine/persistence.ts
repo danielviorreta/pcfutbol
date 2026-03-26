@@ -115,6 +115,7 @@ function makeMigratedLegacyGame(legacy: Partial<ManagerGameState>): ManagerGameS
     financeEntries: [],
     pendingTransferOffers: [],
     pendingRenewalOffers: [],
+    pendingOutgoingTransfers: [],
     leagueState: legacy.leagueState,
   }
 }
@@ -175,6 +176,9 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
       : [],
     financeEntries: Array.isArray((game as Partial<ManagerGameState>).financeEntries)
       ? (game as Partial<ManagerGameState>).financeEntries ?? []
+      : [],
+    pendingOutgoingTransfers: Array.isArray((game as Partial<ManagerGameState>).pendingOutgoingTransfers)
+      ? (game as Partial<ManagerGameState>).pendingOutgoingTransfers ?? []
       : [],
     managerSquadOrder: normalizeManagerSquadOrder(game),
     leagueState: {
