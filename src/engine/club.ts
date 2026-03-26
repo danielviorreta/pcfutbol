@@ -1,7 +1,7 @@
 import { buildSeasonFixtures } from '../data/seedData'
 import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import { simulateAiContractRenewals, simulateAiTransferWindow } from './transfers'
-import type { IncomingTransferOffer, LeagueState, PendingRenewalOffer, Player, PlayoffTie, Position, PromisedRole, Tactic, Team, TrainingFocus } from '../types/game'
+import type { FinanceBreakdownItem, IncomingTransferOffer, LeagueState, PendingRenewalOffer, Player, PlayoffTie, Position, PromisedRole, Tactic, Team, TrainingFocus } from '../types/game'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -416,13 +416,14 @@ export function applyWeeklyClubManagement(
   state: LeagueState,
   managerTeamId: string,
   existingIncomingOffers: IncomingTransferOffer[] = [],
-): { nextState: LeagueState; headlines: string[]; incomingOffers: IncomingTransferOffer[] } {
+): { nextState: LeagueState; headlines: string[]; incomingOffers: IncomingTransferOffer[]; financeBreakdown: FinanceBreakdownItem[] } {
   const standings = buildStandingsIndex(state.teams)
   const isSeasonOver = state.currentRound > state.totalRounds
   const midSeasonRound = Math.floor(state.totalRounds / 2)
   const isMidSeasonCheckpoint = state.currentRound === midSeasonRound + 1
 
   const headlines: string[] = []
+  const financeBreakdown: FinanceBreakdownItem[] = []
 
   if (isMidSeasonCheckpoint) {
     headlines.push('Comite de competicion: se perdonan 2 amarillas a todos los jugadores.')
@@ -435,6 +436,18 @@ export function applyWeeklyClubManagement(
   const nextTeams = state.teams.map((team) => {
     const payroll = Math.round(weeklyPayroll(team))
     let budget = team.budget + team.sponsor.weeklyIncome - payroll
+    financeBreakdown.push({
+      teamId: team.id,
+      category: 'sponsor',
+      amount: team.sponsor.weeklyIncome,
+      description: `Sponsor ${team.sponsor.name}`,
+    })
+    financeBreakdown.push({
+      teamId: team.id,
+      category: 'salary',
+      amount: -payroll,
+      description: 'Nómina semanal',
+    })
 
     let sponsor = { ...team.sponsor }
     const rank = standings.get(team.id) ?? 99
@@ -442,6 +455,12 @@ export function applyWeeklyClubManagement(
     if (isSeasonOver && !sponsor.seasonBonusPaid && rank <= sponsor.targetRank) {
       budget += sponsor.seasonBonus
       sponsor = { ...sponsor, seasonBonusPaid: true }
+      financeBreakdown.push({
+        teamId: team.id,
+        category: 'sponsor',
+        amount: sponsor.seasonBonus,
+        description: `Bonus final de sponsor ${sponsor.name}`,
+      })
       headlines.push(`${team.name} cobra bonus del sponsor (${sponsor.name}).`)
     }
 
@@ -533,6 +552,7 @@ export function applyWeeklyClubManagement(
     })(),
     headlines,
     incomingOffers,
+    financeBreakdown,
   }
 }
 

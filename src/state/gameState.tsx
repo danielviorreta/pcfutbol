@@ -26,6 +26,9 @@ import {
 } from '../engine/squad'
 import { acceptIncomingTransferOffer, buyPlayer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
 import type {
+  FinanceCategory,
+  FinanceBreakdownItem,
+  FinanceEntry,
   GameSummary,
   IncomingTransferOffer,
   MatchCommentaryEvent,
@@ -95,6 +98,42 @@ interface GameContextValue {
 
 const GameContext = createContext<GameContextValue | null>(null)
 const DEFAULT_SEASON_START_YEAR = 2025
+const MAX_FINANCE_ENTRIES = 160
+
+function createFinanceEntry(
+  round: number,
+  teamId: string,
+  category: FinanceCategory,
+  amount: number,
+  description: string,
+): FinanceEntry {
+  return {
+    id: `fin-${teamId}-${round}-${Math.round(Math.random() * 1_000_000)}`,
+    round,
+    teamId,
+    category,
+    amount,
+    description,
+  }
+}
+
+function appendFinanceEntries(prev: ManagerGameState, entries: FinanceEntry[]): FinanceEntry[] {
+  return [...entries.filter((entry) => entry.amount !== 0), ...(prev.financeEntries ?? [])].slice(0, MAX_FINANCE_ENTRIES)
+}
+
+function getTeamBudget(teams: Team[], teamId: string): number {
+  return teams.find((team) => team.id === teamId)?.budget ?? 0
+}
+
+function mapBreakdownToEntries(
+  round: number,
+  items: FinanceBreakdownItem[] | undefined,
+  managerTeamId: string,
+): FinanceEntry[] {
+  return (items ?? [])
+    .filter((item) => item.teamId === managerTeamId && item.amount !== 0)
+    .map((item) => createFinanceEntry(round, item.teamId, item.category, item.amount, item.description))
+}
 
 function getManagerTeam(game: ManagerGameState | null): Team | null {
   if (!game) {
@@ -120,6 +159,7 @@ function buildGame(input: CreateGameInput): ManagerGameState {
     managerTeamId: managerTeam.id,
     managerLineup: getDefaultLineup(managerTeam),
     managerSquadOrder: managerTeam.players.map((player) => player.id),
+    financeEntries: [],
     pendingTransferOffers: [],
     pendingRenewalOffers: [],
     leagueState,
@@ -697,7 +737,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       })
       const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
-      const { nextState, headlines, incomingOffers } = applyWeeklyClubManagement(
+      const { nextState, headlines, incomingOffers, financeBreakdown } = applyWeeklyClubManagement(
         simulatedState,
         prev.managerTeamId,
         prev.pendingTransferOffers,
@@ -726,9 +766,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setNotice(renewalMessages.join(' | '))
       }
 
+      const resolvedRenewalOffers = (prev.pendingRenewalOffers ?? []).filter((o) => resolvedIds.includes(o.id))
+      const financeEntries = appendFinanceEntries(prev, [
+        ...mapBreakdownToEntries(prev.leagueState.currentRound, simulatedState.financeBreakdown, prev.managerTeamId),
+        ...mapBreakdownToEntries(prev.leagueState.currentRound, financeBreakdown, prev.managerTeamId),
+        ...resolvedRenewalOffers.map((offer) => createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'renewal', -offer.signingBonus, `Renovación de ${offer.playerName}`)),
+      ])
+
       return {
         ...prev,
         seasonStartYear: seasonRolledOver ? prev.seasonStartYear + 1 : prev.seasonStartYear,
+        financeEntries,
         leagueState: afterRenewals,
         pendingTransferOffers,
         pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
@@ -816,7 +864,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
     const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
-    const { nextState, headlines, incomingOffers } = applyWeeklyClubManagement(
+    const { nextState, headlines, incomingOffers, financeBreakdown } = applyWeeklyClubManagement(
       simulatedState,
       game.managerTeamId,
       game.pendingTransferOffers,
@@ -840,11 +888,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       nextManagerTeam,
       afterRenewals.currentRound,
     )
+    const resolvedRenewalOffers = (game.pendingRenewalOffers ?? []).filter((o) => resolvedIds.includes(o.id))
+    const financeEntries = appendFinanceEntries(game, [
+      ...mapBreakdownToEntries(game.leagueState.currentRound, simulatedState.financeBreakdown, game.managerTeamId),
+      ...mapBreakdownToEntries(game.leagueState.currentRound, financeBreakdown, game.managerTeamId),
+      ...resolvedRenewalOffers.map((offer) => createFinanceEntry(game.leagueState.currentRound, game.managerTeamId, 'renewal', -offer.signingBonus, `Renovación de ${offer.playerName}`)),
+    ])
 
     const nextGame: ManagerGameState = {
       ...game,
       updatedAt: new Date().toISOString(),
       seasonStartYear: seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
+      financeEntries,
       leagueState: afterRenewals,
       pendingTransferOffers,
       pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
@@ -1065,9 +1120,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       const managerTeamAfterTransfer =
         nextState.teams.find((team) => team.id === prev.managerTeamId) ?? nextState.teams[0]
+      const spent = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
+      const playerName = managerTeamAfterTransfer.players[managerTeamAfterTransfer.players.length - 1]?.name ?? 'Nuevo fichaje'
 
       return {
         ...prev,
+        financeEntries: appendFinanceEntries(prev, [
+          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'transfer-in', -spent, `Fichaje de ${playerName}`),
+        ]),
         leagueState: nextState,
         managerLineup: syncManagerLineup(managerTeamAfterTransfer, prev.managerLineup),
         managerSquadOrder: syncManagerSquadOrder(managerTeamAfterTransfer, prev.managerSquadOrder),
@@ -1137,9 +1197,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       const nextManagerTeam = nextState.teams.find((team) => team.id === prev.managerTeamId) ?? nextState.teams[0]
+      const income = getTeamBudget(nextState.teams, prev.managerTeamId) - getTeamBudget(prev.leagueState.teams, prev.managerTeamId)
 
       return {
         ...prev,
+        financeEntries: appendFinanceEntries(prev, [
+          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'transfer-out', income, `Venta de ${offer.playerName}`),
+        ]),
         leagueState: nextState,
         pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
         managerLineup: syncManagerLineup(nextManagerTeam, prev.managerLineup),
@@ -1262,7 +1326,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return prev
       }
 
-      return { ...prev, leagueState: nextState }
+      const cost = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
+      return {
+        ...prev,
+        financeEntries: appendFinanceEntries(prev, [
+          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'infrastructure', -cost, 'Ampliación de estadio'),
+        ]),
+        leagueState: nextState,
+      }
     })
   }
 
@@ -1274,7 +1345,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return prev
       }
 
-      return { ...prev, leagueState: nextState }
+      const cost = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
+      return {
+        ...prev,
+        financeEntries: appendFinanceEntries(prev, [
+          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'staff', -cost, 'Mejora de cuerpo médico'),
+        ]),
+        leagueState: nextState,
+      }
     })
   }
 
@@ -1286,7 +1364,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return prev
       }
 
-      return { ...prev, leagueState: nextState }
+      const cost = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
+      return {
+        ...prev,
+        financeEntries: appendFinanceEntries(prev, [
+          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'staff', -cost, 'Mejora de disciplina'),
+        ]),
+        leagueState: nextState,
+      }
     })
   }
 

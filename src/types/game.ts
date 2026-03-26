@@ -69,6 +69,32 @@ export interface SponsorDeal {
   seasonBonusPaid: boolean
 }
 
+export type FinanceCategory =
+  | 'sponsor'
+  | 'ticketing'
+  | 'salary'
+  | 'transfer-in'
+  | 'transfer-out'
+  | 'renewal'
+  | 'infrastructure'
+  | 'staff'
+
+export interface FinanceEntry {
+  id: string
+  round: number
+  teamId: string
+  category: FinanceCategory
+  amount: number
+  description: string
+}
+
+export interface FinanceBreakdownItem {
+  teamId: string
+  category: FinanceCategory
+  amount: number
+  description: string
+}
+
 export interface ClubStaff {
   medicalLevel: number
   disciplineLevel: number
@@ -269,6 +295,7 @@ export interface ManagerGameState {
   managerTeamId: string
   managerLineup: string[]
   managerSquadOrder: string[]
+  financeEntries: FinanceEntry[]
   pendingTransferOffers: IncomingTransferOffer[]
   pendingRenewalOffers: PendingRenewalOffer[]
   leagueState: LeagueState

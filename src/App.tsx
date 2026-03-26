@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { DashboardPage } from './pages/DashboardPage'
 import { ClubPage } from './pages/ClubPage'
 import { CalendarPage } from './pages/CalendarPage'
+import { FinancePage } from './pages/FinancePage'
 import { GamesPage } from './pages/GamesPage'
 import { MatchDayPage } from './pages/MatchDayPage'
 import { PlayerManagementPage } from './pages/PlayerManagementPage'
@@ -69,6 +70,7 @@ function App() {
         <NavLink to="/games">Partidas</NavLink>
         {game && <NavLink to="/dashboard">Dashboard</NavLink>}
         {game && <NavLink to="/calendar">Calendario</NavLink>}
+        {game && <NavLink to="/finances">Finanzas</NavLink>}
         {game && <NavLink to="/squad">Plantilla</NavLink>}
         {game && <NavLink to="/club">Club</NavLink>}
         {game && <NavLink to="/promotions">Ascensos</NavLink>}
@@ -89,6 +91,7 @@ function App() {
         <Route path="/games" element={<GamesPage />} />
         <Route path="/dashboard" element={game ? <DashboardPage /> : <Navigate to="/games" replace />} />
         <Route path="/calendar" element={game ? <CalendarPage /> : <Navigate to="/games" replace />} />
+        <Route path="/finances" element={game ? <FinancePage /> : <Navigate to="/games" replace />} />
         <Route path="/matchday" element={game ? <MatchDayPage /> : <Navigate to="/games" replace />} />
         <Route path="/squad" element={game ? <SquadPage /> : <Navigate to="/games" replace />} />
         <Route path="/club" element={game ? <ClubPage /> : <Navigate to="/games" replace />} />
