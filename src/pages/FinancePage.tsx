@@ -39,17 +39,12 @@ function sumAmounts(entries: FinanceEntry[]): number {
 
 export function FinancePage() {
   const { game, managerTeam } = useGame()
-
-  if (!game || !managerTeam) {
-    return null
-  }
-
   const managerEntries = useMemo(
-    () => (game.financeEntries ?? []).filter((entry) => entry.teamId === managerTeam.id),
-    [game.financeEntries, managerTeam.id],
+    () => (!game || !managerTeam ? [] : (game.financeEntries ?? []).filter((entry) => entry.teamId === managerTeam.id)),
+    [game, managerTeam],
   )
 
-  const currentRound = Math.min(game.leagueState.currentRound, game.leagueState.totalRounds)
+  const currentRound = game ? Math.min(game.leagueState.currentRound, game.leagueState.totalRounds) : 1
   const currentWeekEntries = managerEntries.filter((entry) => entry.round === currentRound)
   const currentIncome = sumAmounts(currentWeekEntries.filter((entry) => entry.amount > 0))
   const currentExpenses = Math.abs(sumAmounts(currentWeekEntries.filter((entry) => entry.amount < 0)))
@@ -90,8 +85,8 @@ export function FinancePage() {
   }, [managerEntries])
 
   const latestEntries = managerEntries.slice(0, 12)
-  const weeklySponsor = managerTeam.sponsor.weeklyIncome
-  const weeklyPayroll = Math.round(managerTeam.players.reduce((sum, player) => sum + player.wage, 0) / 52)
+  const weeklySponsor = managerTeam?.sponsor.weeklyIncome ?? 0
+  const weeklyPayroll = managerTeam ? Math.round(managerTeam.players.reduce((sum, player) => sum + player.wage, 0) / 52) : 0
   const operatingMargin = weeklySponsor - weeklyPayroll
   const trendPoints = weeklyRows
     .slice()
@@ -105,6 +100,10 @@ export function FinancePage() {
       return `${x},${y}`
     })
     .join(' ')
+
+  if (!game || !managerTeam) {
+    return null
+  }
 
   return (
     <section className="page-grid finances-grid">

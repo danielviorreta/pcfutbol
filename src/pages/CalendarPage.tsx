@@ -63,10 +63,8 @@ export function CalendarPage() {
   const [selectedCompetition, setSelectedCompetition] = useState<CalendarCompetition>(initialCompetition)
   const [selectedRound, setSelectedRound] = useState<number | null>(null)
 
-  if (!game || !managerTeam) return null
-
-  const allTeams = game.leagueState.teams
-  const allFixtures = game.leagueState.fixtures
+  const allTeams = game?.leagueState.teams ?? []
+  const allFixtures = game?.leagueState.fixtures ?? []
 
   const availableRounds = Array.from(
     new Set(
@@ -76,7 +74,7 @@ export function CalendarPage() {
     ),
   ).sort((a, b) => a - b)
 
-  const currentRound = Math.min(game.leagueState.currentRound, game.leagueState.totalRounds)
+  const currentRound = game ? Math.min(game.leagueState.currentRound, game.leagueState.totalRounds) : 1
   const effectiveRound = selectedRound && availableRounds.includes(selectedRound)
     ? selectedRound
     : availableRounds.includes(currentRound)
@@ -105,6 +103,8 @@ export function CalendarPage() {
       active.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
   }, [effectiveRound])
+
+  if (!game || !managerTeam) return null
 
   return (
     <section className="page-grid calendar-grid">
