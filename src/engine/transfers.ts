@@ -346,17 +346,121 @@ function isTransferWindow(round: number, totalRounds: number): boolean {
   return round <= 4 || (round >= midSeasonRound - 1 && round <= midSeasonRound + 2)
 }
 
+function refreshAiTransferListings(
+  state: LeagueState,
+  managerTeamId: string,
+): { nextState: LeagueState; headlines: string[] } {
+  const headlines: string[] = []
+
+  const nextTeams = state.teams.map((team) => {
+    if (team.id === managerTeamId) {
+      return team
+    }
+
+    const teamAverage = (team.attack + team.midfield + team.defense) / 3
+    let listedCount = 0
+    let newListings = 0
+
+    const players = team.players.map((player) => {
+      if (player.transferListed) {
+        listedCount += 1
+
+        const shouldDelist =
+          player.contractYears >= 3
+          && player.happiness >= 72
+          && player.overall >= teamAverage
+          && Math.random() < 0.16
+
+        if (!shouldDelist) {
+          return player
+        }
+
+        listedCount = Math.max(0, listedCount - 1)
+        return {
+          ...player,
+          transferListed: false,
+          askingPrice: player.releaseClause,
+        }
+      }
+
+      const shortContract = player.contractYears <= 1
+      const unhappy = player.happiness <= 60
+      const expendable = player.overall <= teamAverage - 1
+      const veteran = typeof player.age === 'number' ? player.age >= 31 : false
+
+      if (!shortContract && !unhappy && !expendable && !veteran) {
+        return player
+      }
+
+      if (listedCount >= 4 && !shortContract && !unhappy) {
+        return player
+      }
+
+      let listingChance = 0.05
+      if (shortContract) {
+        listingChance += 0.24
+      }
+      if (unhappy) {
+        listingChance += 0.18
+      }
+      if (expendable) {
+        listingChance += 0.1
+      }
+      if (veteran) {
+        listingChance += 0.06
+      }
+      if (player.overall >= teamAverage + 5 && !shortContract && !unhappy) {
+        listingChance -= 0.12
+      }
+
+      if (Math.random() >= clamp(listingChance, 0.03, 0.55)) {
+        return player
+      }
+
+      listedCount += 1
+      newListings += 1
+
+      const saleFactor = shortContract ? 0.72 : unhappy ? 0.78 : 0.84
+
+      return {
+        ...player,
+        transferListed: true,
+        askingPrice: Math.max(150_000, Math.round(player.releaseClause * saleFactor)),
+      }
+    })
+
+    if (newListings > 0) {
+      headlines.push(`Mercado: ${team.name} coloca ${newListings} jugador${newListings === 1 ? '' : 'es'} en venta.`)
+    }
+
+    return {
+      ...team,
+      players,
+    }
+  })
+
+  return {
+    nextState: {
+      ...state,
+      teams: nextTeams,
+    },
+    headlines,
+  }
+}
+
 export function simulateAiTransferWindow(
   state: LeagueState,
   managerTeamId: string,
   existingIncomingOffers: IncomingTransferOffer[] = [],
 ): { nextState: LeagueState; headlines: string[]; incomingOffers: IncomingTransferOffer[] } {
+  const listingUpdate = refreshAiTransferListings(state, managerTeamId)
+
   if (!isTransferWindow(state.currentRound, state.totalRounds)) {
-    return { nextState: state, headlines: [], incomingOffers: [] }
+    return { nextState: listingUpdate.nextState, headlines: listingUpdate.headlines, incomingOffers: [] }
   }
 
-  let workingState = state
-  const headlines: string[] = []
+  let workingState = listingUpdate.nextState
+  const headlines: string[] = [...listingUpdate.headlines]
   const incomingOffers: IncomingTransferOffer[] = []
   const maxTransfers = Math.random() > 0.72 ? 2 : 1
   const existingOfferKeys = new Set(existingIncomingOffers.map((offer) => `${offer.buyerTeamId}:${offer.playerId}`))

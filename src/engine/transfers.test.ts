@@ -202,11 +202,7 @@ describe('transfers engine', () => {
     const state = makeState([manager, buyer, seller])
     state.currentRound = 2
 
-    const random = vi.spyOn(Math, 'random')
-    random
-      .mockReturnValueOnce(0.8)
-      .mockReturnValueOnce(0.2)
-      .mockReturnValueOnce(0.3)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.3)
 
     const result = simulateAiTransferWindow(state, 'mgr')
     random.mockRestore()
@@ -217,5 +213,34 @@ describe('transfers engine', () => {
     expect(result.headlines.length).toBeGreaterThan(0)
     expect(nextBuyer.players.some((player) => player.id === 'sell-1')).toBe(true)
     expect(nextSeller.players.some((player) => player.id === 'sell-1')).toBe(false)
+  })
+
+  it('lets AI list players for sale even outside transfer windows', () => {
+    const manager = makeTeam('mgr', 'Manager FC', 15_000_000, [
+      makePlayer('mgr-1', 'Manager Player', 75, 2_000_000),
+    ])
+
+    const aiPlayer = makePlayer('ai-1', 'Contract Risk', 74, 3_500_000)
+    aiPlayer.contractYears = 1
+    aiPlayer.happiness = 57
+
+    const aiTeam = makeTeam('ai', 'AI FC', 14_000_000, [
+      aiPlayer,
+      ...Array.from({ length: 18 }, (_, index) => makePlayer(`ai-${index + 2}`, `AI Extra ${index}`, 69, 1_800_000)),
+    ])
+
+    const state = makeState([manager, aiTeam])
+    state.currentRound = 6
+
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    const result = simulateAiTransferWindow(state, 'mgr')
+    random.mockRestore()
+
+    const nextAiTeam = result.nextState.teams.find((team) => team.id === 'ai')
+    const listedCount = nextAiTeam?.players.filter((player) => player.transferListed).length ?? 0
+
+    expect(listedCount).toBeGreaterThan(0)
+    expect(result.headlines.some((headline) => headline.includes('en venta'))).toBe(true)
+    expect(result.incomingOffers).toHaveLength(0)
   })
 })
