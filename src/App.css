@@ -338,6 +338,13 @@ h2 {
   justify-items: center;
   gap: 0.12rem;
   z-index: 3;
+  padding: 0.18rem 0.2rem;
+  border-radius: 0.45rem;
+}
+
+.tactic-node.is-drop-target {
+  background: rgb(50 29 10 / 0.6);
+  box-shadow: inset 0 0 0 1px rgb(223 163 111 / 0.45);
 }
 
 .tactic-role {
@@ -594,8 +601,34 @@ h2 {
 }
 
 .squad-row.is-unavailable {
-  opacity: 0.58;
+  opacity: 0.86;
   cursor: default;
+}
+
+.squad-row.is-injured td {
+  background: linear-gradient(90deg, rgb(110 16 16 / 0.34), rgb(70 12 12 / 0.16));
+  border-top-color: rgb(206 70 70 / 0.18);
+  border-bottom-color: rgb(206 70 70 / 0.18);
+}
+
+.squad-row.is-suspended td {
+  background: linear-gradient(90deg, rgb(116 62 8 / 0.32), rgb(74 38 4 / 0.15));
+  border-top-color: rgb(226 148 49 / 0.18);
+  border-bottom-color: rgb(226 148 49 / 0.18);
+}
+
+.squad-row.is-injured td:first-child,
+.squad-row.is-suspended td:first-child {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.squad-row.is-injured td:first-child {
+  border-left-color: rgb(224 74 74 / 0.72);
+}
+
+.squad-row.is-suspended td:first-child {
+  border-left-color: rgb(238 157 55 / 0.74);
 }
 
 .squad-row.is-starter td:first-child {
@@ -717,28 +750,70 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.08rem 0.35rem;
+  padding: 0.18rem 0.48rem;
   border: 1px solid transparent;
-  font-size: 0.74rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
   letter-spacing: 0.03em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.status-chip-label {
+  line-height: 1.1;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.22);
 }
 
 .status-chip.is-available {
-  color: #bfe9c6;
-  border-color: rgb(131 204 144 / 0.35);
-  background: rgb(20 64 32 / 0.45);
+  color: #d9f7df;
+  border-color: rgb(115 214 139 / 0.46);
+  background: linear-gradient(180deg, rgb(24 78 38 / 0.92), rgb(15 53 26 / 0.9));
+  box-shadow: inset 0 1px 0 rgb(220 255 228 / 0.06);
+}
+
+.status-chip.is-available .status-chip-icon {
+  color: #10341b;
+  background: linear-gradient(180deg, #b6f4c3, #73d68b);
+  box-shadow: 0 0 0 1px rgb(205 255 215 / 0.18);
 }
 
 .status-chip.is-injured {
-  color: #ffb1b1;
-  border-color: rgb(203 84 84 / 0.45);
-  background: rgb(77 20 20 / 0.55);
+  color: #ffe1e1;
+  border-color: rgb(255 92 92 / 0.78);
+  background: linear-gradient(180deg, rgb(133 17 17 / 0.96), rgb(82 10 10 / 0.94));
+  box-shadow: inset 0 1px 0 rgb(255 220 220 / 0.08), 0 0 0 1px rgb(86 8 8 / 0.2);
+}
+
+.status-chip.is-injured .status-chip-icon {
+  color: #fff7f7;
+  background: radial-gradient(circle at 35% 35%, #ff9b9b, #df2f2f 62%, #b81313 100%);
+  box-shadow: 0 0 0 1px rgb(255 222 222 / 0.22), 0 0 12px rgb(219 45 45 / 0.24);
 }
 
 .status-chip.is-suspended {
-  color: #ffd39a;
-  border-color: rgb(218 126 66 / 0.45);
-  background: rgb(66 33 8 / 0.6);
+  color: #ffe7bf;
+  border-color: rgb(255 170 67 / 0.82);
+  background: linear-gradient(180deg, rgb(120 61 5 / 0.96), rgb(73 37 3 / 0.94));
+  box-shadow: inset 0 1px 0 rgb(255 233 193 / 0.08), 0 0 0 1px rgb(79 41 3 / 0.18);
+}
+
+.status-chip.is-suspended .status-chip-icon {
+  color: #fffaf2;
+  background: radial-gradient(circle at 35% 35%, #ffd08a, #ea8b13 60%, #b45a00 100%);
+  box-shadow: 0 0 0 1px rgb(255 232 190 / 0.24), 0 0 12px rgb(234 139 19 / 0.22);
 }
 
 .renewal-state-chip {

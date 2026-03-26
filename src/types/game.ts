@@ -268,6 +268,7 @@ export interface ManagerGameState {
   managerName: string
   managerTeamId: string
   managerLineup: string[]
+  managerSquadOrder: string[]
   pendingTransferOffers: IncomingTransferOffer[]
   pendingRenewalOffers: PendingRenewalOffer[]
   leagueState: LeagueState

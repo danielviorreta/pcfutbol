@@ -146,6 +146,47 @@ export function getDefaultLineup(team: Team): string[] {
   return pickBestLineupForSlots(team, slots).map((player) => player.id)
 }
 
+export function sanitizeLineupSelection(team: Team, lineupIds: string[]): string[] {
+  const validIds = new Set(team.players.map((player) => player.id))
+  const slotCount = getFormationSlots(team).length
+
+  return [...new Set(lineupIds)].filter((playerId) => validIds.has(playerId)).slice(0, slotCount)
+}
+
+export interface LineupIssue {
+  type: 'missing-players' | 'missing-goalkeeper' | 'unavailable-player'
+  playerId?: string
+  playerName?: string
+}
+
+export function getLineupIssues(team: Team, lineupIds: string[]): LineupIssue[] {
+  const selectedIds = sanitizeLineupSelection(team, lineupIds)
+  const selectedPlayers = selectedIds
+    .map((playerId) => team.players.find((player) => player.id === playerId))
+    .filter((player): player is Player => Boolean(player))
+  const issues: LineupIssue[] = []
+
+  if (selectedIds.length !== getFormationSlots(team).length) {
+    issues.push({ type: 'missing-players' })
+  }
+
+  const unavailablePlayers = selectedPlayers.filter((player) => !isPlayerAvailable(player))
+  unavailablePlayers.forEach((player) => {
+    issues.push({
+      type: 'unavailable-player',
+      playerId: player.id,
+      playerName: player.name,
+    })
+  })
+
+  const hasGoalkeeper = selectedPlayers.some((player) => getNaturalPositions(player).includes('GK'))
+  if (!hasGoalkeeper) {
+    issues.push({ type: 'missing-goalkeeper' })
+  }
+
+  return issues
+}
+
 export function normalizeLineup(team: Team, lineupIds: string[]): string[] {
   const uniqueIds = [...new Set(lineupIds)]
   const validIds = uniqueIds.filter((playerId) =>
@@ -178,7 +219,7 @@ export function canToggleInLineup(team: Team, lineupIds: string[], playerId: str
 }
 
 export function getLineupPlayers(team: Team, lineupIds: string[]): Player[] {
-  const normalized = normalizeLineup(team, lineupIds)
+  const normalized = sanitizeLineupSelection(team, lineupIds)
 
   return normalized
     .map((id) => team.players.find((player) => player.id === id))
@@ -195,7 +236,7 @@ export interface LineupAssignment {
 
 export function getLineupAssignments(team: Team, lineupIds: string[]): LineupAssignment[] {
   const slots = getFormationSlots(team)
-  const normalized = normalizeLineup(team, lineupIds)
+  const normalized = sanitizeLineupSelection(team, lineupIds)
 
   return slots.map((role, slotIndex) => {
     const playerId = normalized[slotIndex]

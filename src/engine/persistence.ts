@@ -82,6 +82,7 @@ function isValidGame(game: Partial<ManagerGameState>): game is ManagerGameState 
     typeof game.managerName === 'string' &&
     typeof game.managerTeamId === 'string' &&
     Array.isArray(game.managerLineup) &&
+    (game.managerSquadOrder === undefined || Array.isArray(game.managerSquadOrder)) &&
     typeof game.leagueState === 'object' &&
     game.leagueState !== null
   )
@@ -110,10 +111,27 @@ function makeMigratedLegacyGame(legacy: Partial<ManagerGameState>): ManagerGameS
     managerName: legacy.managerName,
     managerTeamId: legacy.managerTeamId,
     managerLineup: legacy.managerLineup,
+    managerSquadOrder: managerTeam?.players.map((player) => player.id) ?? [],
     pendingTransferOffers: [],
     pendingRenewalOffers: [],
     leagueState: legacy.leagueState,
   }
+}
+
+function normalizeManagerSquadOrder(game: ManagerGameState): string[] {
+  const managerTeam = game.leagueState.teams.find((team) => team.id === game.managerTeamId)
+  if (!managerTeam) {
+    return []
+  }
+
+  const validIds = new Set(managerTeam.players.map((player) => player.id))
+  const rawOrder = Array.isArray((game as Partial<ManagerGameState>).managerSquadOrder)
+    ? (game as Partial<ManagerGameState>).managerSquadOrder as string[]
+    : []
+  const normalized = [...new Set(rawOrder)].filter((playerId) => validIds.has(playerId))
+  const missing = managerTeam.players.map((player) => player.id).filter((playerId) => !normalized.includes(playerId))
+
+  return [...normalized, ...missing]
 }
 
 function persistStorage(storage: SaveStorage): void {
@@ -136,6 +154,7 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
     pendingRenewalOffers: Array.isArray((game as Partial<ManagerGameState>).pendingRenewalOffers)
       ? (game as Partial<ManagerGameState>).pendingRenewalOffers ?? []
       : [],
+    managerSquadOrder: normalizeManagerSquadOrder(game),
     leagueState: {
       ...game.leagueState,
       promotionSummary: game.leagueState.promotionSummary ?? [],

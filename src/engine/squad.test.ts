@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRoleFit, normalizeLineup } from './squad'
+import { getLineupIssues, getRoleFit, normalizeLineup, sanitizeLineupSelection } from './squad'
 import type { Player, Team } from '../types/game'
 
 function makePlayer(id: string, position: Player['position']): Player {
@@ -130,5 +130,32 @@ describe('squad engine', () => {
 
     expect(normalized).toContain('gk2')
     expect(normalized).not.toContain('gk')
+  })
+
+  it('reports lineup issues without silently changing the selected players', () => {
+    const players = [
+      { ...makePlayer('gk', 'GK'), injuryWeeks: 1 },
+      makePlayer('d1', 'DEF'),
+      makePlayer('d2', 'DEF'),
+      makePlayer('d3', 'DEF'),
+      makePlayer('d4', 'DEF'),
+      makePlayer('m1', 'MID'),
+      makePlayer('m2', 'MID'),
+      makePlayer('m3', 'MID'),
+      makePlayer('f1', 'FWD'),
+      makePlayer('f2', 'FWD'),
+      makePlayer('f3', 'FWD'),
+      makePlayer('gk2', 'GK'),
+    ]
+    const team = makeTeam(players)
+
+    const selectedLineup = ['gk', 'd1', 'd2', 'd3', 'd4', 'm1', 'm2', 'm3', 'f1', 'f2', 'f3']
+
+    expect(sanitizeLineupSelection(team, selectedLineup)).toEqual(selectedLineup)
+    expect(getLineupIssues(team, selectedLineup)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'unavailable-player', playerId: 'gk' }),
+      ]),
+    )
   })
 })

@@ -19,9 +19,10 @@ import {
   canToggleInLineup,
   getDefaultLineup,
   getFormationSlots,
+  getLineupIssues,
   getTeamRatings,
   isPlayerAvailable,
-  normalizeLineup,
+  sanitizeLineupSelection,
 } from '../engine/squad'
 import { acceptIncomingTransferOffer, buyPlayer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
 import type {
@@ -72,6 +73,7 @@ interface GameContextValue {
   resetGame: () => void
   toggleLineupPlayer: (playerId: string) => void
   setLineupSlotPlayer: (slotIndex: number, playerId: string) => void
+  reorderSquadPlayer: (sourcePlayerId: string, targetPlayerId: string) => void
   autoPickLineup: () => void
   purchasePlayer: (playerId: string, wageOffer: number, signingBonus: number, contractYears: number, promisedRole: PromisedRole, feeOffer?: number) => void
   listPlayerForTransfer: (playerId: string, askingPrice: number) => void
@@ -117,6 +119,7 @@ function buildGame(input: CreateGameInput): ManagerGameState {
     managerName: input.managerName.trim() || 'Mister',
     managerTeamId: managerTeam.id,
     managerLineup: getDefaultLineup(managerTeam),
+    managerSquadOrder: managerTeam.players.map((player) => player.id),
     pendingTransferOffers: [],
     pendingRenewalOffers: [],
     leagueState,
@@ -159,6 +162,42 @@ function getCurrentManagerFixture(game: ManagerGameState) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
+}
+
+function syncManagerLineup(team: Team, lineup: string[]): string[] {
+  return sanitizeLineupSelection(team, lineup)
+}
+
+function syncManagerSquadOrder(team: Team, order: string[]): string[] {
+  const validIds = new Set(team.players.map((player) => player.id))
+  const normalized = [...new Set(order)].filter((playerId) => validIds.has(playerId))
+  const missing = team.players.map((player) => player.id).filter((playerId) => !normalized.includes(playerId))
+
+  return [...normalized, ...missing]
+}
+
+function buildLineupWarning(team: Team, lineup: string[]): string | null {
+  const issues = getLineupIssues(team, lineup)
+  if (issues.length === 0) {
+    return null
+  }
+
+  const unavailablePlayers = issues
+    .filter((issue) => issue.type === 'unavailable-player' && issue.playerName)
+    .map((issue) => issue.playerName)
+
+  const messages: string[] = []
+  if (issues.some((issue) => issue.type === 'missing-players')) {
+    messages.push('tu once titular no tiene 11 jugadores asignados')
+  }
+  if (issues.some((issue) => issue.type === 'missing-goalkeeper')) {
+    messages.push('falta un portero en el once')
+  }
+  if (unavailablePlayers.length > 0) {
+    messages.push(`hay jugadores no disponibles: ${unavailablePlayers.join(', ')}`)
+  }
+
+  return `Revisa la alineacion antes de empezar: ${messages.join(' · ')}.`
 }
 
 function buildMatchStats(homeTeam: Team, awayTeam: Team, homeLineup: string[], awayLineup: string[], homeGoals: number, awayGoals: number): MatchStats {
@@ -693,7 +732,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         leagueState: afterRenewals,
         pendingTransferOffers,
         pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
-        managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
+        managerLineup: syncManagerLineup(nextManagerTeam, prev.managerLineup),
+        managerSquadOrder: syncManagerSquadOrder(nextManagerTeam, prev.managerSquadOrder),
       }
     })
     if (!game?.pendingRenewalOffers?.length) {
@@ -725,14 +765,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return false
     }
 
+    const managerFixtureTeam = homeTeam.id === game.managerTeamId
+      ? homeTeam
+      : awayTeam.id === game.managerTeamId
+        ? awayTeam
+        : null
+
+    if (!managerFixtureTeam) {
+      setNotice('No se pudo identificar tu alineacion para este partido.')
+      return false
+    }
+
+    const lineupWarning = buildLineupWarning(managerFixtureTeam, game.managerLineup)
+    if (lineupWarning) {
+      setNotice(lineupWarning)
+      return false
+    }
+
+    const managerLineup = syncManagerLineup(managerFixtureTeam, game.managerLineup)
+
     setMatchPresentation({
       phase: 'preview',
       round: game.leagueState.currentRound,
       fixtureId: fixture.id,
       homeTeamId: fixture.homeTeamId,
       awayTeamId: fixture.awayTeamId,
-      homeLineup: homeTeam.id === game.managerTeamId ? normalizeLineup(homeTeam, game.managerLineup) : getDefaultLineup(homeTeam),
-      awayLineup: awayTeam.id === game.managerTeamId ? normalizeLineup(awayTeam, game.managerLineup) : getDefaultLineup(awayTeam),
+      homeLineup: homeTeam.id === game.managerTeamId ? managerLineup : getDefaultLineup(homeTeam),
+      awayLineup: awayTeam.id === game.managerTeamId ? managerLineup : getDefaultLineup(awayTeam),
     })
 
     return true
@@ -789,7 +848,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       leagueState: afterRenewals,
       pendingTransferOffers,
       pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
-      managerLineup: normalizeLineup(nextManagerTeam, game.managerLineup),
+      managerLineup: syncManagerLineup(nextManagerTeam, game.managerLineup),
+      managerSquadOrder: syncManagerSquadOrder(nextManagerTeam, game.managerSquadOrder),
     }
 
     const nextGames = games.map((candidate) =>
@@ -897,7 +957,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return {
         ...prev,
-        managerLineup: normalizeLineup(currentTeam, nextLineup),
+        managerLineup: syncManagerLineup(currentTeam, nextLineup),
       }
     })
   }
@@ -934,7 +994,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return prev
       }
 
-      const normalized = normalizeLineup(currentTeam, prev.managerLineup)
+      const normalized = syncManagerLineup(currentTeam, prev.managerLineup)
       const nextLineup = [...normalized]
       const existingIndex = nextLineup.findIndex((id, idx) => id === playerId && idx !== slotIndex)
       const previousAtSlot = nextLineup[slotIndex]
@@ -946,7 +1006,34 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return {
         ...prev,
-        managerLineup: normalizeLineup(currentTeam, nextLineup),
+        managerLineup: syncManagerLineup(currentTeam, nextLineup),
+        managerSquadOrder: syncManagerSquadOrder(currentTeam, prev.managerSquadOrder),
+      }
+    })
+  }
+
+  const reorderSquadPlayer = (sourcePlayerId: string, targetPlayerId: string) => {
+    updateActiveGame((prev) => {
+      const currentTeam = getManagerTeam(prev)
+      if (!currentTeam || sourcePlayerId === targetPlayerId) {
+        return prev
+      }
+
+      const nextOrder = syncManagerSquadOrder(currentTeam, prev.managerSquadOrder)
+      const sourceIndex = nextOrder.indexOf(sourcePlayerId)
+      const targetIndex = nextOrder.indexOf(targetPlayerId)
+
+      if (sourceIndex < 0 || targetIndex < 0) {
+        return prev
+      }
+
+      const reordered = [...nextOrder]
+      const [sourcePlayer] = reordered.splice(sourceIndex, 1)
+      reordered.splice(targetIndex, 0, sourcePlayer)
+
+      return {
+        ...prev,
+        managerSquadOrder: reordered,
       }
     })
   }
@@ -982,7 +1069,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return {
         ...prev,
         leagueState: nextState,
-        managerLineup: normalizeLineup(managerTeamAfterTransfer, prev.managerLineup),
+        managerLineup: syncManagerLineup(managerTeamAfterTransfer, prev.managerLineup),
+        managerSquadOrder: syncManagerSquadOrder(managerTeamAfterTransfer, prev.managerSquadOrder),
       }
     })
   }
@@ -1054,7 +1142,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         leagueState: nextState,
         pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
-        managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
+        managerLineup: syncManagerLineup(nextManagerTeam, prev.managerLineup),
+        managerSquadOrder: syncManagerSquadOrder(nextManagerTeam, prev.managerSquadOrder),
       }
     })
   }
@@ -1097,7 +1186,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return {
         ...prev,
         leagueState: nextLeagueState,
-        managerLineup: normalizeLineup(nextManagerTeam, prev.managerLineup),
+        managerLineup: syncManagerLineup(nextManagerTeam, prev.managerLineup),
+        managerSquadOrder: syncManagerSquadOrder(nextManagerTeam, prev.managerSquadOrder),
       }
     })
     setNotice(`Tactica actualizada: ${tactic}.`)
@@ -1150,7 +1240,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return {
         ...prev,
         leagueState: nextState,
-        managerLineup: normalizeLineup(managerTeamAfter, prev.managerLineup),
+        managerLineup: syncManagerLineup(managerTeamAfter, prev.managerLineup),
+        managerSquadOrder: syncManagerSquadOrder(managerTeamAfter, prev.managerSquadOrder),
       }
     })
   }
@@ -1224,6 +1315,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     resetGame,
     toggleLineupPlayer,
     setLineupSlotPlayer,
+    reorderSquadPlayer,
     autoPickLineup,
     purchasePlayer,
     listPlayerForTransfer,
