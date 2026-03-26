@@ -1,7 +1,7 @@
 import { buildSeasonFixtures } from '../data/seedData'
-import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
+import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import { simulateAiContractRenewals, simulateAiTransferWindow } from './transfers'
-import type { IncomingTransferOffer, LeagueState, PendingRenewalOffer, Player, PlayoffTie, Position, PromisedRole, Tactic, Team, TrainingFocus } from '../types/game'
+import type { FinanceBreakdownItem, IncomingTransferOffer, LeagueState, PendingRenewalOffer, Player, PlayoffTie, Position, PromisedRole, Tactic, Team, TrainingFocus } from '../types/game'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -103,10 +103,29 @@ function applyTrainingToTeam(team: Team): Team {
 
     const form = clamp(player.form + formBoost - (fatigue > 70 ? 2 : 0), 45, 99)
 
-    const baseGrowth = growthRoll > 0.86 ? 1 : 0
-    const overall = clamp(player.overall + baseGrowth + focusBonus, 50, 95)
+    const age = estimatePlayerAge(player)
+    const role = estimateSquadRole(team, player.id)
+    const minutesShare = estimateRecentMinutesShare(team, player, role)
+    const softCap = age <= 20
+      ? Math.min(94, player.overall + 14)
+      : age <= 23
+        ? Math.min(92, player.overall + 9)
+        : age <= 27
+          ? Math.min(90, player.overall + 5)
+          : Math.min(88, player.overall + 2)
+    const growthRoom = Math.max(0, softCap - player.overall)
 
-    const value = Math.round(overall * overall * 14_500)
+    const ageFactor = age <= 20 ? 1.25 : age <= 23 ? 1 : age <= 27 ? 0.72 : age <= 30 ? 0.45 : 0.2
+    const roomFactor = growthRoom >= 10 ? 1.15 : growthRoom >= 6 ? 0.9 : growthRoom >= 3 ? 0.55 : 0.2
+    const performanceFactor = form >= 80 ? 1.1 : form <= 58 ? 0.8 : 1
+    const focusFactor = focusBonus > 0 ? 1.08 : 1
+
+    // Weekly gains are intentionally conservative to avoid +8/+10 in half a season.
+    const growthChance = clamp(0.035 * ageFactor * roomFactor * performanceFactor * focusFactor * (0.6 + minutesShare), 0.005, 0.14)
+    const baseGrowth = growthRoll < growthChance ? 1 : 0
+    const overall = clamp(player.overall + baseGrowth, 50, Math.max(player.overall, softCap))
+
+    const value = estimatePlayerValue(overall, team.division, player.age)
 
     return {
       ...player,
@@ -416,13 +435,14 @@ export function applyWeeklyClubManagement(
   state: LeagueState,
   managerTeamId: string,
   existingIncomingOffers: IncomingTransferOffer[] = [],
-): { nextState: LeagueState; headlines: string[]; incomingOffers: IncomingTransferOffer[] } {
+): { nextState: LeagueState; headlines: string[]; incomingOffers: IncomingTransferOffer[]; financeBreakdown: FinanceBreakdownItem[] } {
   const standings = buildStandingsIndex(state.teams)
   const isSeasonOver = state.currentRound > state.totalRounds
   const midSeasonRound = Math.floor(state.totalRounds / 2)
   const isMidSeasonCheckpoint = state.currentRound === midSeasonRound + 1
 
   const headlines: string[] = []
+  const financeBreakdown: FinanceBreakdownItem[] = []
 
   if (isMidSeasonCheckpoint) {
     headlines.push('Comite de competicion: se perdonan 2 amarillas a todos los jugadores.')
@@ -435,6 +455,18 @@ export function applyWeeklyClubManagement(
   const nextTeams = state.teams.map((team) => {
     const payroll = Math.round(weeklyPayroll(team))
     let budget = team.budget + team.sponsor.weeklyIncome - payroll
+    financeBreakdown.push({
+      teamId: team.id,
+      category: 'sponsor',
+      amount: team.sponsor.weeklyIncome,
+      description: `Sponsor ${team.sponsor.name}`,
+    })
+    financeBreakdown.push({
+      teamId: team.id,
+      category: 'salary',
+      amount: -payroll,
+      description: 'Nómina semanal',
+    })
 
     let sponsor = { ...team.sponsor }
     const rank = standings.get(team.id) ?? 99
@@ -442,6 +474,12 @@ export function applyWeeklyClubManagement(
     if (isSeasonOver && !sponsor.seasonBonusPaid && rank <= sponsor.targetRank) {
       budget += sponsor.seasonBonus
       sponsor = { ...sponsor, seasonBonusPaid: true }
+      financeBreakdown.push({
+        teamId: team.id,
+        category: 'sponsor',
+        amount: sponsor.seasonBonus,
+        description: `Bonus final de sponsor ${sponsor.name}`,
+      })
       headlines.push(`${team.name} cobra bonus del sponsor (${sponsor.name}).`)
     }
 
@@ -533,6 +571,7 @@ export function applyWeeklyClubManagement(
     })(),
     headlines,
     incomingOffers,
+    financeBreakdown,
   }
 }
 
@@ -937,7 +976,7 @@ export function promoteYouthPlayer(
     age: youth.age,
     position: youth.position,
     overall: youth.overall,
-    value: Math.round(youth.overall * youth.overall * 13_500),
+    value: estimatePlayerValue(youth.overall, team.division, youth.age),
     wage: Math.round(130_000 + youth.overall * 3200),
     releaseClause: 0,
     transferListed: false,

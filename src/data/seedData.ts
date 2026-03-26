@@ -10,7 +10,7 @@ import type {
   TrainingFocus,
   YouthPlayer,
 } from '../types/game'
-import { estimatePlayerHappiness, estimateReleaseClause } from '../engine/playerMarket'
+import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from '../engine/playerMarket'
 import { PLAYER_OVERALL_OVERRIDES, PLAYER_REAL_AGES } from './playerRealData'
 
 type TeamSeed = Omit<
@@ -1511,21 +1511,22 @@ function buildPlayer(team: TeamSeedWithDivision, teamIndex: number, playerIndex:
     ? buildPlayerName(seed + teamIndex * 10)
     : lowerDivisionFallbackRealNames[(seed + teamIndex * 17 + playerIndex * 13) % lowerDivisionFallbackRealNames.length]
   const playerName = roster?.name ?? fallbackName
+  const age = buildRealisticPlayerAge(seed, position, overall, playerIndex, team.division, playerName)
   const naturalPositions = inferNaturalPositions(position, playerIndex)
-  const value = Math.round(overall * overall * 14_500)
+  const value = estimatePlayerValue(overall, team.division, age)
   const wage = Math.round(overall * 12_000 + (seed % 90_000))
   const contractYears = 1 + (seed % 5)
   const happiness = estimatePlayerHappiness(team, contractYears, ((seed % 11) - 5) * 2)
   const releaseClause = estimateReleaseClause({ value, wage, overall, contractYears }, team, happiness)
   const transferListed = playerIndex >= 13 && ((seed + teamIndex) % 4 === 0 || happiness <= 58 || contractYears <= 1)
   const askingPrice = transferListed
-    ? Math.max(300_000, Math.round(releaseClause * (0.72 + (seed % 16) / 100)))
+    ? Math.max(team.division === 'Primera' ? 300_000 : team.division === 'Segunda' ? 180_000 : 90_000, Math.round(releaseClause * (0.72 + (seed % 16) / 100)))
     : releaseClause
 
   return {
     id: `${team.id}-p${playerIndex + 1}`,
     name: playerName,
-    age: buildRealisticPlayerAge(seed, position, overall, playerIndex, team.division, playerName),
+    age,
     position,
     naturalPositions,
     overall,
@@ -1575,13 +1576,33 @@ function toTeam(base: TeamSeedWithDivision, teamIndex: number): Team {
     goalsAgainst: 0,
     players,
     youthPlayers: youthShape.map((_, idx) => buildYouth(base, idx)),
-    sponsor: {
-      name: sponsors[teamIndex % sponsors.length],
-      weeklyIncome: 320_000 + teamIndex * 28_000,
-      targetRank: Math.min(6, 2 + Math.floor(teamIndex / 2)),
-      seasonBonus: 2_800_000 - teamIndex * 180_000,
-      seasonBonusPaid: false,
-    },
+    sponsor: (() => {
+      const divisionIndex = teamIndex % 20
+      const isPrimera = base.division === 'Primera'
+      const isSegunda = base.division === 'Segunda'
+      // Weekly income by division:
+      //   Primera:           280k–840k
+      //   Segunda:           85k–230k
+      //   1ª RFEF:           35k–90k
+      const weeklyIncome = isPrimera
+        ? 280_000 + divisionIndex * 28_000
+        : isSegunda
+          ? 85_000 + divisionIndex * 7_500
+          : 35_000 + divisionIndex * 2_750
+      // Season bonus ≈ ~4× typical weekly income for the division
+      const seasonBonus = isPrimera
+        ? 1_800_000 - divisionIndex * 60_000
+        : isSegunda
+          ? 450_000 - divisionIndex * 15_000
+          : 160_000 - divisionIndex * 3_500
+      return {
+        name: sponsors[teamIndex % sponsors.length],
+        weeklyIncome: Math.max(isPrimera ? 200_000 : isSegunda ? 60_000 : 28_000, weeklyIncome),
+        targetRank: Math.min(6, 2 + Math.floor(divisionIndex / 4)),
+        seasonBonus: Math.max(isPrimera ? 400_000 : isSegunda ? 80_000 : 50_000, seasonBonus),
+        seasonBonusPaid: false,
+      }
+    })(),
     staff: {
       medicalLevel: 1,
       disciplineLevel: 1,

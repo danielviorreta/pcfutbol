@@ -1,4 +1,4 @@
-import type { Fixture, LeagueState, MatchResult, Player, Team } from '../types/game'
+import type { FinanceBreakdownItem, Fixture, LeagueState, MatchResult, Player, Team } from '../types/game'
 import { getDefaultLineup, getTeamRatings, isPlayerAvailable, normalizeLineup } from './squad'
 
 interface PlayRoundOptions {
@@ -71,8 +71,9 @@ function getInjuryDuration(fatigue: number): number {
 
 function sampleHalfGoals(offenseScore: number, defenseScore: number, tempo = 1): number {
   const edge = offenseScore - defenseScore
-  const base = 0.55 + edge / 72
-  const withVariance = base * tempo + (Math.random() * 1.1 - 0.55)
+  // Softer edge scaling avoids over-penalizing attacks against slightly stronger defenses.
+  const base = 0.68 + edge / 220
+  const withVariance = base * tempo + (Math.random() * 0.9 - 0.45)
 
   return clamp(Math.round(withVariance), 0, 4)
 }
@@ -221,9 +222,10 @@ function getMatchPack(
   }
 }
 
-function applyMatchDayRevenue(teams: Team[], results: MatchResult[]): Team[] {
+function applyMatchDayRevenue(teams: Team[], results: MatchResult[]): { teams: Team[]; finance: FinanceBreakdownItem[] } {
   const teamsById = new Map(teams.map((t) => [t.id, t]))
   const revenueByTeamId = new Map<string, number>()
+  const finance: FinanceBreakdownItem[] = []
 
   for (const result of results) {
     const homeTeam = teamsById.get(result.homeTeamId)
@@ -251,13 +253,22 @@ function applyMatchDayRevenue(teams: Team[], results: MatchResult[]): Team[] {
     const revenue = Math.round(stadium.capacity * fillRate * stadium.ticketPrice)
 
     revenueByTeamId.set(result.homeTeamId, revenue)
+    finance.push({
+      teamId: result.homeTeamId,
+      category: 'ticketing',
+      amount: revenue,
+      description: `Taquilla vs ${awayTeam?.name ?? 'rival'}`,
+    })
   }
 
-  return teams.map((team) => {
+  return {
+    teams: teams.map((team) => {
     const revenue = revenueByTeamId.get(team.id)
 
     return revenue !== undefined ? { ...team, budget: team.budget + revenue } : team
-  })
+    }),
+    finance,
+  }
 }
 
 function updateTeamTable(teams: Team[], results: MatchResult[]): Team[] {
@@ -487,7 +498,7 @@ function makeMedicalHeadline(teams: Team[]): string | null {
   return null
 }
 
-export function playCurrentRound(state: LeagueState, options: PlayRoundOptions): LeagueState {
+export function playCurrentRound(state: LeagueState, options: PlayRoundOptions): LeagueState & { financeBreakdown?: FinanceBreakdownItem[] } {
   if (state.currentRound > state.totalRounds) {
     return state
   }
@@ -503,7 +514,7 @@ export function playCurrentRound(state: LeagueState, options: PlayRoundOptions):
   const results = packs.map((pack) => pack.result)
 
   const updatedTableTeams = updateTeamTable(recoveredTeams, results)
-  const revenueTeams = applyMatchDayRevenue(updatedTableTeams, results)
+  const { teams: revenueTeams, finance: financeBreakdown } = applyMatchDayRevenue(updatedTableTeams, results)
   const { teams: updatedTeams, incidents } = applyLineupEffects(revenueTeams, packs)
 
   const updatedFixtures = state.fixtures.map((fixture) => {
@@ -532,6 +543,7 @@ export function playCurrentRound(state: LeagueState, options: PlayRoundOptions):
     teams: updatedTeams,
     fixtures: updatedFixtures,
     lastResults: results,
+    financeBreakdown,
     news: [...incidentHeadlines, medicalHeadline, headline, ...state.news].filter(Boolean).slice(0, 12) as string[],
   }
 }

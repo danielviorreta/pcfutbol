@@ -89,7 +89,7 @@ function formatCurrency(value: number): string {
 function getPlayerStatusInfo(injuryWeeks: number, suspensionWeeks: number, yellowCards: number) {
   if (injuryWeeks > 0) {
     return {
-      icon: '✚',
+      icon: '+',
       label: `Lesionado (${injuryWeeks})`,
       className: 'status-chip is-injured',
     }
@@ -98,7 +98,7 @@ function getPlayerStatusInfo(injuryWeeks: number, suspensionWeeks: number, yello
   if (suspensionWeeks > 0) {
     const byAccumulation = yellowCards >= 4
     return {
-      icon: byAccumulation ? '🟨🟨' : '🟥',
+      icon: byAccumulation ? '!!' : '!',
       label: `Sancionado (${suspensionWeeks})`,
       className: 'status-chip is-suspended',
     }
@@ -143,9 +143,10 @@ function getFitTierClass(fit: number): 'is-good' | 'is-ok' | 'is-bad' {
 }
 
 export function SquadPage() {
-  const { game, managerTeam, setLineupSlotPlayer, autoPickLineup, setTactic } = useGame()
+  const { game, managerTeam, setLineupSlotPlayer, reorderSquadPlayer, autoPickLineup, setTactic } = useGame()
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null)
   const [dragOverPlayerId, setDragOverPlayerId] = useState<string | null>(null)
+  const [dragOverSlotIndex, setDragOverSlotIndex] = useState<number | null>(null)
 
   const assignments = useMemo(
     () => (game && managerTeam ? getLineupAssignments(managerTeam, game.managerLineup) : []),
@@ -183,13 +184,19 @@ export function SquadPage() {
       .filter((player): player is NonNullable<typeof player> => Boolean(player))
     const starterIds = new Set(starters.map((player) => player.id))
 
-    const bench = managerTeam.players
-      .filter((player) => !starterIds.has(player.id))
-      .slice()
-      .sort((a, b) => b.overall - a.overall)
+    const squadOrder = game?.managerSquadOrder ?? managerTeam.players.map((player) => player.id)
+    const bench = squadOrder
+      .map((playerId) => managerTeam.players.find((player) => player.id === playerId))
+      .filter((player): player is Player => {
+        if (!player) {
+          return false
+        }
+
+        return !starterIds.has(player.id)
+      })
 
     return [...starters, ...bench]
-  }, [assignments, managerTeam])
+  }, [assignments, game?.managerSquadOrder, managerTeam])
 
   const mapCoords = tacticSlotCoords[tactic]
 
@@ -200,6 +207,7 @@ export function SquadPage() {
   const clearDrag = () => {
     setDraggedPlayerId(null)
     setDragOverPlayerId(null)
+    setDragOverSlotIndex(null)
   }
 
   const onRowDragStart = (event: DragEvent<HTMLTableRowElement>, playerId: string) => {
@@ -213,15 +221,13 @@ export function SquadPage() {
       return
     }
 
-    // At least one of them must be involved in the lineup (starter ↔ bench or starter ↔ starter)
     const draggedIsStarter = roleByPlayerId.has(draggedPlayerId)
     const targetIsStarter = roleByPlayerId.has(targetPlayerId)
-    if (!draggedIsStarter && !targetIsStarter) {
-      return
-    }
+    const isBenchReorder = !draggedIsStarter && !targetIsStarter
 
-    // The player moving INTO a starter slot must be available
-    const incomingToStarterSlot = draggedIsStarter ? null : draggedPlayerId
+    // Bench-to-bench reorder never needs availability checks.
+    // Moving a bench player into the XI still requires availability.
+    const incomingToStarterSlot = !isBenchReorder && draggedIsStarter ? null : !isBenchReorder ? draggedPlayerId : null
     if (incomingToStarterSlot) {
       const player = managerTeam.players.find((p) => p.id === incomingToStarterSlot)
       if (!player || !isPlayerAvailable(player)) {
@@ -257,8 +263,37 @@ export function SquadPage() {
       if (targetPlayer && isPlayerAvailable(targetPlayer)) {
         setLineupSlotPlayer(sourceAssignment.slotIndex, targetPlayerId)
       }
+    } else {
+      reorderSquadPlayer(sourceId, targetPlayerId)
     }
 
+    clearDrag()
+  }
+
+  const onSlotDragOver = (event: DragEvent<HTMLDivElement>, slotIndex: number) => {
+    if (!draggedPlayerId) {
+      return
+    }
+
+    const player = managerTeam.players.find((candidate) => candidate.id === draggedPlayerId)
+    if (!player || !isPlayerAvailable(player)) {
+      return
+    }
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverSlotIndex(slotIndex)
+  }
+
+  const onSlotDrop = (event: DragEvent<HTMLDivElement>, slotIndex: number) => {
+    event.preventDefault()
+    const sourceId = draggedPlayerId || event.dataTransfer.getData('text/plain')
+    if (!sourceId) {
+      clearDrag()
+      return
+    }
+
+    setLineupSlotPlayer(slotIndex, sourceId)
     clearDrag()
   }
 
@@ -313,8 +348,11 @@ export function SquadPage() {
             return (
               <div
                 key={`map-${slot.slotIndex}-${slot.role}`}
-                className="tactic-node"
+                className={`tactic-node ${dragOverSlotIndex === slot.slotIndex ? 'is-drop-target' : ''}`}
                 style={{ left: `${point.x}%`, top: `${point.y}%` }}
+                onDragOver={(event) => onSlotDragOver(event, slot.slotIndex)}
+                onDragLeave={() => setDragOverSlotIndex(null)}
+                onDrop={(event) => onSlotDrop(event, slot.slotIndex)}
               >
                 <span className="tactic-role">{slot.role}</span>
                 <strong className="tactic-player">{slot.player ? shortPlayerName(slot.player.name) : '-'}</strong>
@@ -331,7 +369,7 @@ export function SquadPage() {
           <span className="competition-badge inline-badge">{managerTeam.division}{managerTeam.group ? ` - ${managerTeam.group}` : ''}</span>
         </h2>
         <p className="squad-hint">
-          Arrastra un jugador sobre otro para intercambiarlos. Los titulares aparecen marcados al inicio de la lista.
+          Arrastra un jugador sobre otro para intercambiarlos. Tambien puedes arrastrar al dibujo tactico para ocupar un hueco concreto y reordenar suplentes entre si.
         </p>
         <div className="position-legend" aria-label="Leyenda de iconos de posicion">
           <span className="position-legend-item">
@@ -387,6 +425,8 @@ export function SquadPage() {
                   className={[
                     'squad-row',
                     assigned ? 'is-starter' : '',
+                    player.injuryWeeks > 0 ? 'is-injured' : '',
+                    player.suspensionWeeks > 0 ? 'is-suspended' : '',
                     !available ? 'is-unavailable' : '',
                     isDragging ? 'is-dragging' : '',
                     isDragOver ? 'is-drag-over' : '',
@@ -461,7 +501,10 @@ export function SquadPage() {
                   <td>{player.fatigue}</td>
                   <td>{player.yellowCards}</td>
                   <td>
-                    <span className={status.className}>{status.icon} {status.label}</span>
+                    <span className={status.className}>
+                      <span className="status-chip-icon" aria-hidden="true">{status.icon}</span>
+                      <span className="status-chip-label">{status.label}</span>
+                    </span>
                   </td>
                   <td>{player.contractYears}</td>
                   <td>{formatCurrency(player.value)}</td>

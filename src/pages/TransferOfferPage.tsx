@@ -1,7 +1,7 @@
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useState } from 'react'
 import { useGame } from '../state/gameState'
-import { assessClubSaleDecision } from '../engine/playerMarket'
+import { assessClubSaleDecision, assessTransferDecision } from '../engine/playerMarket'
 import type { PromisedRole } from '../types/game'
 
 function formatCurrency(value: number): string {
@@ -22,7 +22,7 @@ const promisedRoleLabels: Record<PromisedRole, string> = {
 export function TransferOfferPage() {
   const { playerId } = useParams()
   const navigate = useNavigate()
-  const { managerTeam, transferTargets, purchasePlayer } = useGame()
+  const { game, managerTeam, transferTargets, purchasePlayer, pendingOutgoingTransfers } = useGame()
 
   const target = transferTargets.find((candidate) => candidate.player.id === playerId)
   const [wageOffer, setWageOffer] = useState(String(target?.recommendedWage ?? '0'))
@@ -44,10 +44,26 @@ export function TransferOfferPage() {
   const effectiveYears = Number.isFinite(parsedYears) ? parsedYears : target.recommendedContractYears
   const effectiveFee = Number.isFinite(parsedFee) && parsedFee > 0 ? parsedFee : target.marketPrice
   const totalImmediateCost = effectiveFee + effectiveBonus
+  const hasPendingOffer = pendingOutgoingTransfers.some((o) => o.playerId === target.player.id)
 
   const clubDecision = effectiveFee < target.marketPrice
     ? assessClubSaleDecision(target.player, target.marketPrice, effectiveFee)
     : { accepted: true, minAcceptablePrice: 0, reason: '' }
+
+  // Calculate player decision based on current inputs
+  const sellerTeam = !game ? null : game.leagueState.teams.find((t) => t.id === target.sellerTeamId)
+  const playerDecision = !game || !sellerTeam || !managerTeam ? { accepted: false, reason: '', score: 0 }
+    : assessTransferDecision(
+      target.player,
+      managerTeam,
+      sellerTeam,
+      {
+        wageOffer: effectiveWage,
+        signingBonus: effectiveBonus,
+        contractYears: effectiveYears,
+        promisedRole,
+      },
+    )
 
   return (
     <section className="page-grid">
@@ -138,18 +154,30 @@ export function TransferOfferPage() {
           </p>
           <p>Coste total (cuantia + prima): <strong>{formatCurrency(totalImmediateCost)}</strong></p>
           <p>Presupuesto actual: <strong>{formatCurrency(managerTeam.budget)}</strong></p>
+          <p style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+            Respuesta del jugador: 
+            <span className={`fee-verdict ${playerDecision.accepted ? 'is-ok' : 'is-rejected'}`}>
+              {' '}{playerDecision.accepted
+                ? '✓ Aceptaría traspasarse'
+                : `✗ ${playerDecision.reason}`}
+            </span>
+          </p>
         </div>
 
         <div className="actions">
-          <button
-            onClick={() => {
-              purchasePlayer(target.player.id, effectiveWage, effectiveBonus, effectiveYears, promisedRole, effectiveFee)
-              navigate('/transfers')
-            }}
-            disabled={managerTeam.budget < totalImmediateCost}
-          >
-            Enviar oferta
-          </button>
+          {hasPendingOffer ? (
+            <p><strong>Oferta pendiente · el club responderá en la próxima jornada</strong></p>
+          ) : (
+            <button
+              onClick={() => {
+                purchasePlayer(target.player.id, effectiveWage, effectiveBonus, effectiveYears, promisedRole, effectiveFee)
+                navigate('/transfers')
+              }}
+              disabled={managerTeam.budget < totalImmediateCost || !playerDecision.accepted}
+            >
+              Enviar oferta
+            </button>
+          )}
           <button className="secondary" onClick={() => navigate('/transfers')}>
             Volver
           </button>

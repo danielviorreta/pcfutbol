@@ -1,4 +1,4 @@
-import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
+import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import type { GameSummary, ManagerGameState } from '../types/game'
 import { PLAYER_REAL_AGES } from '../data/playerRealData'
 
@@ -82,6 +82,7 @@ function isValidGame(game: Partial<ManagerGameState>): game is ManagerGameState 
     typeof game.managerName === 'string' &&
     typeof game.managerTeamId === 'string' &&
     Array.isArray(game.managerLineup) &&
+    (game.managerSquadOrder === undefined || Array.isArray(game.managerSquadOrder)) &&
     typeof game.leagueState === 'object' &&
     game.leagueState !== null
   )
@@ -110,14 +111,51 @@ function makeMigratedLegacyGame(legacy: Partial<ManagerGameState>): ManagerGameS
     managerName: legacy.managerName,
     managerTeamId: legacy.managerTeamId,
     managerLineup: legacy.managerLineup,
+    managerSquadOrder: managerTeam?.players.map((player) => player.id) ?? [],
+    financeEntries: [],
     pendingTransferOffers: [],
     pendingRenewalOffers: [],
+    pendingOutgoingTransfers: [],
     leagueState: legacy.leagueState,
   }
 }
 
+function normalizeManagerSquadOrder(game: ManagerGameState): string[] {
+  const managerTeam = game.leagueState.teams.find((team) => team.id === game.managerTeamId)
+  if (!managerTeam) {
+    return []
+  }
+
+  const validIds = new Set(managerTeam.players.map((player) => player.id))
+  const rawOrder = Array.isArray((game as Partial<ManagerGameState>).managerSquadOrder)
+    ? (game as Partial<ManagerGameState>).managerSquadOrder as string[]
+    : []
+  const normalized = [...new Set(rawOrder)].filter((playerId) => validIds.has(playerId))
+  const missing = managerTeam.players.map((player) => player.id).filter((playerId) => !normalized.includes(playerId))
+
+  return [...normalized, ...missing]
+}
+
 function persistStorage(storage: SaveStorage): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(storage))
+}
+
+function normalizeSponsor(team: { division?: string; sponsor: { name: string; weeklyIncome: number; targetRank: number; seasonBonus: number; seasonBonusPaid: boolean } }): typeof team.sponsor {
+  const isPrimera = team.division === 'Primera'
+  const isSegunda = team.division === 'Segunda'
+  const current = team.sponsor
+  // Cap inflated weekly income from old saves
+  const maxWeekly = isPrimera ? 840_000 : isSegunda ? 230_000 : 90_000
+  const minWeekly = isPrimera ? 200_000 : isSegunda ? 60_000 : 28_000
+  const maxBonus = isPrimera ? 1_800_000 : isSegunda ? 450_000 : 160_000
+  const minBonus = isPrimera ? 400_000 : isSegunda ? 80_000 : 50_000
+
+  const weeklyIncome = clamp(current.weeklyIncome, minWeekly, maxWeekly)
+  const seasonBonus = current.seasonBonusPaid
+    ? current.seasonBonus
+    : clamp(current.seasonBonus, minBonus, maxBonus)
+
+  return { ...current, weeklyIncome, seasonBonus }
 }
 
 function normalizeGame(game: ManagerGameState): ManagerGameState {
@@ -136,6 +174,13 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
     pendingRenewalOffers: Array.isArray((game as Partial<ManagerGameState>).pendingRenewalOffers)
       ? (game as Partial<ManagerGameState>).pendingRenewalOffers ?? []
       : [],
+    financeEntries: Array.isArray((game as Partial<ManagerGameState>).financeEntries)
+      ? (game as Partial<ManagerGameState>).financeEntries ?? []
+      : [],
+    pendingOutgoingTransfers: Array.isArray((game as Partial<ManagerGameState>).pendingOutgoingTransfers)
+      ? (game as Partial<ManagerGameState>).pendingOutgoingTransfers ?? []
+      : [],
+    managerSquadOrder: normalizeManagerSquadOrder(game),
     leagueState: {
       ...game.leagueState,
       promotionSummary: game.leagueState.promotionSummary ?? [],
@@ -155,51 +200,46 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
             ? (team.group ?? (groupOneIds.has(team.id) ? 'Grupo 1' : 'Grupo 2'))
             : undefined),
         staff: team.staff ?? { medicalLevel: 1, disciplineLevel: 1 },
-        players: team.players.map((player) => ({
-          ...player,
-          age:
+        sponsor: normalizeSponsor(team),
+        players: team.players.map((player) => {
+          const age =
             typeof player.age === 'number'
               ? clamp(Math.round(player.age), 16, 40)
-              : estimateMissingPlayerAge(player, team.division),
-          yellowCards: player.yellowCards ?? 0,
-          happiness:
+              : estimateMissingPlayerAge(player, team.division)
+          const contractYears = player.contractYears ?? 3
+          const happiness =
             typeof player.happiness === 'number'
               ? player.happiness
-              : estimatePlayerHappiness(team, player.contractYears ?? 3),
-          releaseClause:
-            typeof player.releaseClause === 'number'
-              ? player.releaseClause
-              : estimateReleaseClause(
-                {
-                  value: player.value,
-                  overall: player.overall,
-                  wage: player.wage,
-                  contractYears: player.contractYears ?? 3,
-                },
-                team,
-                typeof player.happiness === 'number'
-                  ? player.happiness
-                  : estimatePlayerHappiness(team, player.contractYears ?? 3),
-              ),
-          transferListed: Boolean((player as Partial<typeof player>).transferListed),
-          askingPrice:
-            typeof (player as Partial<typeof player>).askingPrice === 'number'
-              ? Math.max(100_000, Math.round((player as Partial<typeof player>).askingPrice as number))
-              : typeof player.releaseClause === 'number'
-                ? player.releaseClause
-                : estimateReleaseClause(
-                  {
-                    value: player.value,
-                    overall: player.overall,
-                    wage: player.wage,
-                    contractYears: player.contractYears ?? 3,
-                  },
-                  team,
-                  typeof player.happiness === 'number'
-                    ? player.happiness
-                    : estimatePlayerHappiness(team, player.contractYears ?? 3),
-                ),
-        })),
+              : estimatePlayerHappiness(team, contractYears)
+          const value = estimatePlayerValue(player.overall, team.division ?? 'Primera', age)
+          const releaseClause = estimateReleaseClause(
+            {
+              value,
+              overall: player.overall,
+              wage: player.wage,
+              contractYears,
+            },
+            team,
+            happiness,
+          )
+          const transferListed = Boolean((player as Partial<typeof player>).transferListed)
+          const askingPriceFloor = team.division === 'Primera' ? 300_000 : team.division === 'Segunda' ? 180_000 : 90_000
+          const askingPrice = transferListed
+            ? Math.max(askingPriceFloor, Math.round(releaseClause * 0.82))
+            : releaseClause
+
+          return {
+            ...player,
+            age,
+            value,
+            yellowCards: player.yellowCards ?? 0,
+            happiness,
+            releaseClause,
+            transferListed,
+            askingPrice,
+            contractYears,
+          }
+        }),
       })),
     },
   }

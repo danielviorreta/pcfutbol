@@ -26,6 +26,50 @@ function getDivisionAppeal(division: Division): number {
   }
 }
 
+const TARGET_VALUE_CURVES: Record<Division, Array<{ overall: number; value: number }>> = {
+  Primera: [
+    { overall: 65, value: 1_100_000 },
+    { overall: 70, value: 2_400_000 },
+    { overall: 75, value: 4_800_000 },
+    { overall: 80, value: 9_500_000 },
+    { overall: 85, value: 18_000_000 },
+    { overall: 90, value: 32_000_000 },
+  ],
+  Segunda: [
+    { overall: 65, value: 300_000 },
+    { overall: 70, value: 850_000 },
+    { overall: 75, value: 1_900_000 },
+    { overall: 80, value: 3_800_000 },
+    { overall: 85, value: 7_000_000 },
+    { overall: 90, value: 12_000_000 },
+  ],
+  'Primera Federacion': [
+    { overall: 65, value: 120_000 },
+    { overall: 70, value: 320_000 },
+    { overall: 75, value: 750_000 },
+    { overall: 80, value: 1_600_000 },
+    { overall: 85, value: 3_000_000 },
+    { overall: 90, value: 5_000_000 },
+  ],
+}
+
+function interpolateTargetValue(overall: number, division: Division): number {
+  const curve = TARGET_VALUE_CURVES[division]
+  const clampedOverall = clamp(overall, curve[0].overall, curve[curve.length - 1].overall)
+
+  for (let index = 0; index < curve.length - 1; index += 1) {
+    const current = curve[index]
+    const next = curve[index + 1]
+
+    if (clampedOverall <= next.overall) {
+      const ratio = (clampedOverall - current.overall) / (next.overall - current.overall)
+      return Math.round(current.value + (next.value - current.value) * ratio)
+    }
+  }
+
+  return curve[curve.length - 1].value
+}
+
 export function getClubAppeal(team: ClubSnapshot): number {
   const sportingLevel = (team.attack + team.midfield + team.defense) / 3
   const budgetFactor = clamp(Math.log10(Math.max(team.budget, 1)) * 4 - 18, 0, 18)
@@ -47,16 +91,47 @@ export function estimatePlayerHappiness(
   )
 }
 
+export function estimatePlayerValue(
+  overall: number,
+  division: Division,
+  age?: number,
+): number {
+  const qualityFactor = overall >= 84 ? 1.08 : overall >= 78 ? 1.02 : overall >= 72 ? 0.96 : 0.88
+  const ageFactor =
+    typeof age !== 'number'
+      ? 1
+      : age <= 21
+        ? 1.12
+        : age <= 24
+          ? 1.06
+          : age >= 33
+            ? 0.76
+            : age >= 29
+              ? 0.9
+              : 1
+
+  const baseValue = interpolateTargetValue(overall, division)
+  const scaledValue = baseValue * qualityFactor * ageFactor
+
+  return Math.max(120_000, Math.round(scaledValue))
+}
+
 export function estimateReleaseClause(
   player: Pick<Player, 'value' | 'overall' | 'wage' | 'contractYears'>,
   team: ClubSnapshot,
   happiness: number,
 ): number {
-  const clubFactor = 1 + getDivisionAppeal(team.division) / 120 + (((team.attack + team.midfield + team.defense) / 3) - 70) / 180
+  const divisionClauseBase =
+    team.division === 'Primera'
+      ? 1.42
+      : team.division === 'Segunda'
+        ? 1.18
+        : 1.05
+  const sportingFactor = ((team.attack + team.midfield + team.defense) / 3 - 70) / 260
   const happinessFactor = 1 + (happiness - 60) / 180
-  const contractFactor = 1 + player.contractYears * 0.08
-  const qualityFactor = 1 + Math.max(0, player.overall - 75) / 120
-  const multiplier = clamp(clubFactor * happinessFactor * contractFactor * qualityFactor, 1.35, 3.8)
+  const contractFactor = 1 + player.contractYears * 0.05
+  const qualityFactor = 1 + Math.max(0, player.overall - 75) / 180
+  const multiplier = clamp((divisionClauseBase + sportingFactor) * happinessFactor * contractFactor * qualityFactor, 1.05, team.division === 'Primera' ? 3.2 : team.division === 'Segunda' ? 2.35 : 1.75)
 
   return Math.round(player.value * multiplier)
 }

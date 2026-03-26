@@ -15,17 +15,24 @@ export function TransfersPage() {
     managerTeam,
     transferTargets,
     pendingTransferOffers,
+    pendingOutgoingTransfers,
     acceptTransferOffer,
     rejectTransferOffer,
+    cancelOutgoingTransfer,
   } = useGame()
   const navigate = useNavigate()
   const [selectedSellerTeamId, setSelectedSellerTeamId] = useState<string>('')
+  const [interestFilter, setInterestFilter] = useState<string>('')
 
   if (!managerTeam) {
     return null
   }
 
-  const listedTargets = transferTargets.filter((target) => target.isTransferListed)
+  const allListedTargets = transferTargets.filter((target) => target.isTransferListed)
+  const interestOptions = [...new Set(allListedTargets.map((t) => t.interestLabel))].sort()
+  const listedTargets = interestFilter
+    ? allListedTargets.filter((target) => target.interestLabel === interestFilter)
+    : allListedTargets
   const sellerTeams = transferTargets
     .reduce<Array<{ id: string; name: string; division: string; group?: string }>>((acc, target) => {
       if (acc.some((team) => team.id === target.sellerTeamId)) {
@@ -89,6 +96,17 @@ export function TransfersPage() {
 
       <article className="panel full-span">
         <h2>Jugadores En Venta (Global)</h2>
+        <div className="actions compact-actions" style={{ marginBottom: '0.75rem' }}>
+          <label>
+            Filtrar por interés
+            <select value={interestFilter} onChange={(e) => setInterestFilter(e.target.value)}>
+              <option value="">Todos</option>
+              {interestOptions.map((label) => (
+                <option key={label} value={label}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <table>
           <thead>
             <tr>
@@ -124,6 +142,31 @@ export function TransfersPage() {
             )}
           </tbody>
         </table>
+      </article>
+
+      <article className="panel full-span">
+        <h2>Ofertas Enviadas (Pendientes)</h2>
+        {pendingOutgoingTransfers.length === 0 ? (
+          <p>No hay ofertas pendientes de respuesta.</p>
+        ) : (
+          <div className="offer-list">
+            {pendingOutgoingTransfers.map((offer) => (
+              <div className="offer-card" key={offer.id}>
+                <div>
+                  <p className="offer-card-title">
+                    Oferta por <strong>{offer.playerName}</strong> · <span style={{ opacity: 0.7 }}>{offer.sellerTeamName}</span>
+                  </p>
+                  <p>Cuantía al club: {formatCurrency(offer.transferFee)} · Prima fichaje: {formatCurrency(offer.signingBonus)}</p>
+                  <p>Salario anual: {formatCurrency(offer.wageOffer)} · Contrato: {offer.contractYears} años · Rol: {offer.promisedRole}</p>
+                  <p><em>Respuesta esperada en la próxima jornada</em></p>
+                </div>
+                <div className="actions">
+                  <button className="secondary" onClick={() => cancelOutgoingTransfer(offer.id)}>Retirar oferta</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </article>
 
       <article className="panel full-span">

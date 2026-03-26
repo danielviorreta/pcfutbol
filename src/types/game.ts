@@ -69,6 +69,32 @@ export interface SponsorDeal {
   seasonBonusPaid: boolean
 }
 
+export type FinanceCategory =
+  | 'sponsor'
+  | 'ticketing'
+  | 'salary'
+  | 'transfer-in'
+  | 'transfer-out'
+  | 'renewal'
+  | 'infrastructure'
+  | 'staff'
+
+export interface FinanceEntry {
+  id: string
+  round: number
+  teamId: string
+  category: FinanceCategory
+  amount: number
+  description: string
+}
+
+export interface FinanceBreakdownItem {
+  teamId: string
+  category: FinanceCategory
+  amount: number
+  description: string
+}
+
 export interface ClubStaff {
   medicalLevel: number
   disciplineLevel: number
@@ -138,6 +164,20 @@ export interface IncomingTransferOffer {
   playerName: string
   transferFee: number
   releaseClause: number
+  wageOffer: number
+  signingBonus: number
+  contractYears: number
+  promisedRole: PromisedRole
+  createdRound: number
+}
+
+export interface PendingOutgoingTransferOffer {
+  id: string
+  playerId: string
+  playerName: string
+  sellerTeamId: string
+  sellerTeamName: string
+  transferFee: number
   wageOffer: number
   signingBonus: number
   contractYears: number
@@ -268,7 +308,10 @@ export interface ManagerGameState {
   managerName: string
   managerTeamId: string
   managerLineup: string[]
+  managerSquadOrder: string[]
+  financeEntries: FinanceEntry[]
   pendingTransferOffers: IncomingTransferOffer[]
+  pendingOutgoingTransfers: PendingOutgoingTransferOffer[]
   pendingRenewalOffers: PendingRenewalOffer[]
   leagueState: LeagueState
 }
@@ -295,6 +338,7 @@ export interface TransferTarget {
   releaseClause: number
   recommendedWage: number
   recommendedSigningBonus: number
+  minimumSigningBonus: number
   recommendedContractYears: number
   recommendedPromisedRole: PromisedRole
   interestLabel: string
