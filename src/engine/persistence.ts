@@ -139,6 +139,24 @@ function persistStorage(storage: SaveStorage): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(storage))
 }
 
+function normalizeSponsor(team: { division?: string; sponsor: { name: string; weeklyIncome: number; targetRank: number; seasonBonus: number; seasonBonusPaid: boolean } }): typeof team.sponsor {
+  const isPrimera = team.division === 'Primera'
+  const isSegunda = team.division === 'Segunda'
+  const current = team.sponsor
+  // Cap inflated weekly income from old saves
+  const maxWeekly = isPrimera ? 840_000 : isSegunda ? 230_000 : 90_000
+  const minWeekly = isPrimera ? 200_000 : isSegunda ? 60_000 : 28_000
+  const maxBonus = isPrimera ? 1_800_000 : isSegunda ? 450_000 : 160_000
+  const minBonus = isPrimera ? 400_000 : isSegunda ? 80_000 : 50_000
+
+  const weeklyIncome = clamp(current.weeklyIncome, minWeekly, maxWeekly)
+  const seasonBonus = current.seasonBonusPaid
+    ? current.seasonBonus
+    : clamp(current.seasonBonus, minBonus, maxBonus)
+
+  return { ...current, weeklyIncome, seasonBonus }
+}
+
 function normalizeGame(game: ManagerGameState): ManagerGameState {
   const primeraFederacionTeams = game.leagueState.teams.filter((team) => team.division === 'Primera Federacion')
   const groupOneIds = new Set(primeraFederacionTeams.slice(0, 20).map((team) => team.id))
@@ -178,6 +196,7 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
             ? (team.group ?? (groupOneIds.has(team.id) ? 'Grupo 1' : 'Grupo 2'))
             : undefined),
         staff: team.staff ?? { medicalLevel: 1, disciplineLevel: 1 },
+        sponsor: normalizeSponsor(team),
         players: team.players.map((player) => {
           const age =
             typeof player.age === 'number'
