@@ -15,6 +15,7 @@ import {
 } from '../engine/club'
 import { loadSaveStorage, saveSaveStorage, toGameSummaries } from '../engine/persistence'
 import { playCurrentRound, sortLeagueTable } from '../engine/simulation'
+import { getOperationalCapacity } from '../engine/stadium'
 import {
   canToggleInLineup,
   getDefaultLineup,
@@ -280,7 +281,7 @@ function buildMatchStats(homeTeam: Team, awayTeam: Team, homeLineup: string[], a
       shotsOnTarget: awayShotsOnTarget,
       bigChances: awayBigChances,
     },
-    attendance: Math.round(homeTeam.stadium.capacity * fillRate),
+    attendance: Math.round(getOperationalCapacity(homeTeam.stadium) * fillRate),
   }
 }
 

@@ -1,4 +1,5 @@
 import type { FinanceBreakdownItem, Fixture, LeagueState, MatchResult, Player, Team } from '../types/game'
+import { getOperationalCapacity } from './stadium'
 import { getDefaultLineup, getTeamRatings, isPlayerAvailable, normalizeLineup } from './squad'
 
 interface PlayRoundOptions {
@@ -250,7 +251,7 @@ function applyMatchDayRevenue(teams: Team[], results: MatchResult[]): { teams: T
     const variance = (Math.random() - 0.5) * 0.06
 
     const fillRate = clamp(0.70 - priceEffect + moraleEffect + importanceEffect + variance, 0.20, 0.98)
-    const revenue = Math.round(stadium.capacity * fillRate * stadium.ticketPrice)
+    const revenue = Math.round(getOperationalCapacity(stadium) * fillRate * stadium.ticketPrice)
 
     revenueByTeamId.set(result.homeTeamId, revenue)
     finance.push({

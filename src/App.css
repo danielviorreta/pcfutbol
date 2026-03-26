@@ -130,6 +130,201 @@ h2 {
   background: rgb(8 36 48 / 0.9);
 }
 
+.stadium-illustration {
+  --stadium-accent: #dfb06a;
+  --stadium-accent-dark: #c67b43;
+  --stadium-club: #143646;
+  --stadium-club-soft: #2a5f76;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgb(9 26 37 / 0.92), rgb(5 15 22 / 0.98));
+  overflow: hidden;
+}
+
+.stadium-illustration svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.stadium-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-dim);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stadium-shadow {
+  fill: rgb(0 0 0 / 0.28);
+}
+
+.stadium-cloud {
+  fill: rgb(202 234 241 / 0.08);
+}
+
+.stadium-light-glow {
+  fill: rgb(130 206 216 / 0.12);
+}
+
+.stadium-roof {
+  stroke: rgb(162 221 229 / 0.22);
+  stroke-width: 1.4;
+}
+
+.stadium-bowl.is-large {
+  stroke-width: 2.4;
+}
+
+.stadium-illustration.is-small .stadium-light-glow {
+  opacity: 0.45;
+}
+
+.stadium-illustration.is-small .stadium-roof {
+  opacity: 0.82;
+}
+
+.stadium-illustration.is-large .stadium-roof {
+  opacity: 1;
+}
+
+.stadium-illustration.is-large .stadium-seating-upper {
+  fill: color-mix(in srgb, var(--stadium-accent) 78%, white);
+}
+
+.stadium-illustration.is-large .stadium-seating-lower {
+  fill: color-mix(in srgb, var(--stadium-accent-dark) 88%, black);
+}
+
+.stadium-bowl {
+  fill: rgb(18 52 66 / 0.95);
+  stroke: rgb(130 206 216 / 0.26);
+  stroke-width: 2;
+}
+
+.stadium-seating-lower {
+  fill: var(--stadium-accent-dark);
+}
+
+.stadium-seating-upper {
+  fill: var(--stadium-accent);
+}
+
+.stadium-seat-line {
+  fill: none;
+  stroke: rgb(92 40 11 / 0.36);
+  stroke-width: 1.8;
+}
+
+.stadium-seat-line.is-upper {
+  stroke: rgb(115 57 20 / 0.3);
+  stroke-width: 1.5;
+}
+
+.stadium-pitch {
+  stroke: rgb(255 255 255 / 0.16);
+  stroke-width: 1.5;
+}
+
+.stadium-pitch-stripes {
+  fill: rgb(255 255 255 / 0.04);
+  mask-image: linear-gradient(90deg, transparent 0%, black 10%, black 20%, transparent 20%, transparent 30%, black 30%, black 40%, transparent 40%, transparent 50%, black 50%, black 60%, transparent 60%, transparent 70%, black 70%, black 80%, transparent 80%, transparent 90%, black 90%, black 100%);
+}
+
+.stadium-lines {
+  fill: none;
+  stroke: rgb(239 255 242 / 0.45);
+  stroke-width: 1.2;
+}
+
+.stadium-goal-box {
+  fill: rgb(235 245 245 / 0.32);
+}
+
+.stadium-penalty-box,
+.stadium-goal-area {
+  fill: none;
+  stroke: rgb(239 255 242 / 0.48);
+  stroke-width: 1.15;
+}
+
+.stadium-crane {
+  fill: #d79a30;
+}
+
+.stadium-crane-group {
+  animation: stadium-sway 4.2s ease-in-out infinite;
+  transform-origin: 248px 90px;
+}
+
+.stadium-crane-line {
+  stroke: #d79a30;
+  stroke-width: 2;
+}
+
+.stadium-crane-load,
+.stadium-scaffold {
+  fill: rgb(125 140 151 / 0.95);
+}
+
+.stadium-cone {
+  fill: none;
+  stroke: #f08f52;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stadium-rubble {
+  fill: none;
+  stroke: rgb(164 168 170 / 0.95);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stadium-new-stand {
+  fill: rgb(228 186 119 / 0.92);
+  animation: stadium-pulse 2.8s ease-in-out infinite;
+}
+
+.stadium-finish-highlight {
+  fill: rgb(130 206 216 / 0.32);
+  animation: stadium-pulse 1.8s ease-in-out infinite;
+}
+
+.stadium-illustration.is-under-construction {
+  box-shadow: inset 0 0 0 1px rgb(240 143 82 / 0.2);
+}
+
+@keyframes stadium-sway {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(1.2deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes stadium-pulse {
+  0% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.65;
+  }
+}
+
 .manager-name input {
   width: 11rem;
   padding: 0.6rem 0.8rem;
