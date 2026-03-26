@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buyPlayer, getTransferTargets, simulateAiTransferWindow } from './transfers'
+import { estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import type { LeagueState, Player, Team } from '../types/game'
 
 function makePlayer(id: string, name: string, overall: number, value: number): Player {
@@ -81,6 +82,43 @@ function makeState(teams: Team[]): LeagueState {
 }
 
 describe('transfers engine', () => {
+  it('scales base player value down for lower divisions', () => {
+    const primeraValue = estimatePlayerValue(74, 'Primera', 24)
+    const segundaValue = estimatePlayerValue(74, 'Segunda', 24)
+    const federacionValue = estimatePlayerValue(74, 'Primera Federacion', 24)
+
+    expect(segundaValue).toBeLessThan(primeraValue)
+    expect(federacionValue).toBeLessThan(segundaValue)
+    expect(primeraValue).toBeGreaterThan(4_000_000)
+    expect(primeraValue).toBeLessThan(5_500_000)
+    expect(segundaValue).toBeGreaterThan(1_400_000)
+    expect(segundaValue).toBeLessThan(2_300_000)
+    expect(federacionValue).toBeGreaterThan(500_000)
+    expect(federacionValue).toBeLessThan(950_000)
+  })
+
+  it('keeps Primera Federacion release clauses in a realistic range', () => {
+    const team = makeTeam('pf', 'Federacion FC', 2_500_000, [])
+    team.division = 'Primera Federacion'
+    team.attack = 74
+    team.midfield = 73
+    team.defense = 72
+
+    const value = estimatePlayerValue(78, 'Primera Federacion', 24)
+    const clause = estimateReleaseClause(
+      {
+        value,
+        overall: 78,
+        wage: 420_000,
+        contractYears: 5,
+      },
+      team,
+      74,
+    )
+
+    expect(clause).toBeLessThan(4_500_000)
+  })
+
   it('returns market targets sorted by overall and excluding manager team', () => {
     const managerTeam = makeTeam('mgr', 'Manager FC', 10_000_000, [
       makePlayer('mgr-1', 'Manager Player', 75, 2_000_000),

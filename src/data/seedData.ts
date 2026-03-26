@@ -10,7 +10,7 @@ import type {
   TrainingFocus,
   YouthPlayer,
 } from '../types/game'
-import { estimatePlayerHappiness, estimateReleaseClause } from '../engine/playerMarket'
+import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from '../engine/playerMarket'
 import { PLAYER_OVERALL_OVERRIDES, PLAYER_REAL_AGES } from './playerRealData'
 
 type TeamSeed = Omit<
@@ -1511,21 +1511,22 @@ function buildPlayer(team: TeamSeedWithDivision, teamIndex: number, playerIndex:
     ? buildPlayerName(seed + teamIndex * 10)
     : lowerDivisionFallbackRealNames[(seed + teamIndex * 17 + playerIndex * 13) % lowerDivisionFallbackRealNames.length]
   const playerName = roster?.name ?? fallbackName
+  const age = buildRealisticPlayerAge(seed, position, overall, playerIndex, team.division, playerName)
   const naturalPositions = inferNaturalPositions(position, playerIndex)
-  const value = Math.round(overall * overall * 14_500)
+  const value = estimatePlayerValue(overall, team.division, age)
   const wage = Math.round(overall * 12_000 + (seed % 90_000))
   const contractYears = 1 + (seed % 5)
   const happiness = estimatePlayerHappiness(team, contractYears, ((seed % 11) - 5) * 2)
   const releaseClause = estimateReleaseClause({ value, wage, overall, contractYears }, team, happiness)
   const transferListed = playerIndex >= 13 && ((seed + teamIndex) % 4 === 0 || happiness <= 58 || contractYears <= 1)
   const askingPrice = transferListed
-    ? Math.max(300_000, Math.round(releaseClause * (0.72 + (seed % 16) / 100)))
+    ? Math.max(team.division === 'Primera' ? 300_000 : team.division === 'Segunda' ? 180_000 : 90_000, Math.round(releaseClause * (0.72 + (seed % 16) / 100)))
     : releaseClause
 
   return {
     id: `${team.id}-p${playerIndex + 1}`,
     name: playerName,
-    age: buildRealisticPlayerAge(seed, position, overall, playerIndex, team.division, playerName),
+    age,
     position,
     naturalPositions,
     overall,

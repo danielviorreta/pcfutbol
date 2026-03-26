@@ -1,4 +1,4 @@
-import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
+import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import type { GameSummary, ManagerGameState } from '../types/game'
 import { PLAYER_REAL_AGES } from '../data/playerRealData'
 
@@ -174,51 +174,45 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
             ? (team.group ?? (groupOneIds.has(team.id) ? 'Grupo 1' : 'Grupo 2'))
             : undefined),
         staff: team.staff ?? { medicalLevel: 1, disciplineLevel: 1 },
-        players: team.players.map((player) => ({
-          ...player,
-          age:
+        players: team.players.map((player) => {
+          const age =
             typeof player.age === 'number'
               ? clamp(Math.round(player.age), 16, 40)
-              : estimateMissingPlayerAge(player, team.division),
-          yellowCards: player.yellowCards ?? 0,
-          happiness:
+              : estimateMissingPlayerAge(player, team.division)
+          const contractYears = player.contractYears ?? 3
+          const happiness =
             typeof player.happiness === 'number'
               ? player.happiness
-              : estimatePlayerHappiness(team, player.contractYears ?? 3),
-          releaseClause:
-            typeof player.releaseClause === 'number'
-              ? player.releaseClause
-              : estimateReleaseClause(
-                {
-                  value: player.value,
-                  overall: player.overall,
-                  wage: player.wage,
-                  contractYears: player.contractYears ?? 3,
-                },
-                team,
-                typeof player.happiness === 'number'
-                  ? player.happiness
-                  : estimatePlayerHappiness(team, player.contractYears ?? 3),
-              ),
-          transferListed: Boolean((player as Partial<typeof player>).transferListed),
-          askingPrice:
-            typeof (player as Partial<typeof player>).askingPrice === 'number'
-              ? Math.max(100_000, Math.round((player as Partial<typeof player>).askingPrice as number))
-              : typeof player.releaseClause === 'number'
-                ? player.releaseClause
-                : estimateReleaseClause(
-                  {
-                    value: player.value,
-                    overall: player.overall,
-                    wage: player.wage,
-                    contractYears: player.contractYears ?? 3,
-                  },
-                  team,
-                  typeof player.happiness === 'number'
-                    ? player.happiness
-                    : estimatePlayerHappiness(team, player.contractYears ?? 3),
-                ),
-        })),
+              : estimatePlayerHappiness(team, contractYears)
+          const value = estimatePlayerValue(player.overall, team.division ?? 'Primera', age)
+          const releaseClause = estimateReleaseClause(
+            {
+              value,
+              overall: player.overall,
+              wage: player.wage,
+              contractYears,
+            },
+            team,
+            happiness,
+          )
+          const transferListed = Boolean((player as Partial<typeof player>).transferListed)
+          const askingPriceFloor = team.division === 'Primera' ? 300_000 : team.division === 'Segunda' ? 180_000 : 90_000
+          const askingPrice = transferListed
+            ? Math.max(askingPriceFloor, Math.round(releaseClause * 0.82))
+            : releaseClause
+
+          return {
+            ...player,
+            age,
+            value,
+            yellowCards: player.yellowCards ?? 0,
+            happiness,
+            releaseClause,
+            transferListed,
+            askingPrice,
+            contractYears,
+          }
+        }),
       })),
     },
   }

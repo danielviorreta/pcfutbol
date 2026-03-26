@@ -1,5 +1,5 @@
 import { buildSeasonFixtures } from '../data/seedData'
-import { estimatePlayerHappiness, estimateReleaseClause } from './playerMarket'
+import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import { simulateAiContractRenewals, simulateAiTransferWindow } from './transfers'
 import type { IncomingTransferOffer, LeagueState, PendingRenewalOffer, Player, PlayoffTie, Position, PromisedRole, Tactic, Team, TrainingFocus } from '../types/game'
 
@@ -106,7 +106,7 @@ function applyTrainingToTeam(team: Team): Team {
     const baseGrowth = growthRoll > 0.86 ? 1 : 0
     const overall = clamp(player.overall + baseGrowth + focusBonus, 50, 95)
 
-    const value = Math.round(overall * overall * 14_500)
+    const value = estimatePlayerValue(overall, team.division, player.age)
 
     return {
       ...player,
@@ -937,7 +937,7 @@ export function promoteYouthPlayer(
     age: youth.age,
     position: youth.position,
     overall: youth.overall,
-    value: Math.round(youth.overall * youth.overall * 13_500),
+    value: estimatePlayerValue(youth.overall, team.division, youth.age),
     wage: Math.round(130_000 + youth.overall * 3200),
     releaseClause: 0,
     transferListed: false,
