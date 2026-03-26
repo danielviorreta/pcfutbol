@@ -170,4 +170,35 @@ describe('simulation engine', () => {
     expect(typeof playedFixture?.homeGoals).toBe('number')
     expect(typeof playedFixture?.awayGoals).toBe('number')
   })
+
+  it('keeps average goals realistic and avoids excessive 0-0 outcomes', () => {
+    const simulations = 1200
+    let totalGoals = 0
+    let nilNilMatches = 0
+
+    for (let index = 0; index < simulations; index += 1) {
+      const home = makeTeam('home', 'Home FC', 72, 68)
+      const away = makeTeam('away', 'Away FC', 72, 68)
+      const { state } = makeState(home, away)
+
+      const nextState = playCurrentRound(state, {
+        managerTeamId: 'home',
+        managerLineup: home.players.slice(0, 11).map((player) => player.id),
+      })
+
+      const match = nextState.lastResults[0]
+      const goals = match.homeGoals + match.awayGoals
+      totalGoals += goals
+
+      if (goals === 0) {
+        nilNilMatches += 1
+      }
+    }
+
+    const averageGoals = totalGoals / simulations
+    const nilNilRate = nilNilMatches / simulations
+
+    expect(averageGoals).toBeGreaterThan(1.9)
+    expect(nilNilRate).toBeLessThan(0.25)
+  })
 })

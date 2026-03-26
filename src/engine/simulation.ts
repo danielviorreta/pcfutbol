@@ -71,8 +71,9 @@ function getInjuryDuration(fatigue: number): number {
 
 function sampleHalfGoals(offenseScore: number, defenseScore: number, tempo = 1): number {
   const edge = offenseScore - defenseScore
-  const base = 0.55 + edge / 72
-  const withVariance = base * tempo + (Math.random() * 1.1 - 0.55)
+  // Softer edge scaling avoids over-penalizing attacks against slightly stronger defenses.
+  const base = 0.68 + edge / 220
+  const withVariance = base * tempo + (Math.random() * 0.9 - 0.45)
 
   return clamp(Math.round(withVariance), 0, 4)
 }
