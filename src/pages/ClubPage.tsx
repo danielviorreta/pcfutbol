@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGame } from '../state/gameState'
+import { StadiumIllustration } from '../components/StadiumIllustration'
+import { getOperationalCapacity } from '../engine/stadium'
 import type { TrainingFocus } from '../types/game'
 
 function formatCurrency(value: number): string {
@@ -41,8 +43,9 @@ export function ClubPage() {
   )
 
   const { stadium } = managerTeam
+  const operationalCapacity = getOperationalCapacity(stadium)
   const fillRate = Math.min(0.95, Math.max(0.55, 0.55 + managerTeam.morale / 200))
-  const estimatedRevenue = Math.round(stadium.capacity * fillRate * stadium.ticketPrice)
+  const estimatedRevenue = Math.round(operationalCapacity * fillRate * stadium.ticketPrice)
   const upgradeCost = Math.max(5_000_000, Math.round(stadium.capacity * 100))
   const medicalUpgradeCost = 800_000 + managerTeam.staff.medicalLevel * 600_000
   const disciplineUpgradeCost = 800_000 + managerTeam.staff.disciplineLevel * 600_000
@@ -67,8 +70,12 @@ export function ClubPage() {
 
       <article className="panel">
         <h2>Estadio</h2>
+        <StadiumIllustration stadium={stadium} teamName={managerTeam.name} />
         <p>Nombre: <strong>{stadium.name}</strong></p>
-        <p>Aforo: <strong>{stadium.capacity.toLocaleString('es-ES')} plazas</strong></p>
+        <p>
+          Aforo: <strong>{stadium.capacity.toLocaleString('es-ES')} plazas</strong>
+          {upgradeInProgress ? ` · operativo durante obras: ${operationalCapacity.toLocaleString('es-ES')}` : ''}
+        </p>
         <p>Entrada actual: <strong>{formatCurrency(stadium.ticketPrice)}</strong></p>
         <p>Ingresos estimados por partido: <strong>{formatCurrency(estimatedRevenue)}</strong></p>
         <div className="actions" style={{ alignItems: 'center' }}>
