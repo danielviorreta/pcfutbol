@@ -4,7 +4,9 @@ Juego de gestion futbolistica inspirado en la etapa clasica de PC Futbol, constr
 
 ## Estado actual
 
-El proyecto ya es jugable end-to-end en modo carrera, con guardado local, simulacion de jornadas, gestion de plantilla, economia de club y flujo de partido con previa/resultado.
+El proyecto es jugable end-to-end en modo carrera y cubre el bucle completo de una temporada: crear partida, gestionar club/plantilla, disputar jornadas, mover mercado, controlar finanzas y cerrar ciclo con ascensos/descensos.
+
+Ademas del guardado automatico en navegador, ya incluye copia de seguridad manual mediante exportacion/importacion de partidas en JSON.
 
 ## Funcionalidades implementadas
 
@@ -12,8 +14,10 @@ El proyecto ya es jugable end-to-end en modo carrera, con guardado local, simula
   - Multiples carreras guardadas en `localStorage`.
   - Crear, cargar, cambiar y eliminar partidas.
   - Nombre de manager y nombre del guardado editables.
+  - Guardado automatico al avanzar y accion de guardado manual.
+  - Exportar todas las partidas a JSON e importar copias locales (backup/restore).
 - Estructura de competicion:
-  - Ligas por divisiones y grupos.
+  - Ligas por divisiones y grupos (Primera, Segunda y Primera Federacion).
   - Clasificacion, calendario y avance por jornadas.
   - Sistema de ascensos/descensos y vista de promociones.
 - Simulacion de partido y jornada:
@@ -21,16 +25,20 @@ El proyecto ya es jugable end-to-end en modo carrera, con guardado local, simula
   - Estadisticas del partido (posesion, tiros, ocasiones, asistencia).
   - Cronologia/comentarios, goleadores e incidencias.
   - Impacto de tactica y sustituciones en la simulacion.
+  - Gestion de cansancio, lesiones/sanciones y noticias semanales.
 - Gestion de plantilla:
   - Once inicial por roles tacticos.
   - Drag & drop directo en la lista para intercambiar jugadores.
   - Mapa tactico visual del once.
   - Indicadores de ajuste posicional (verde/naranja/rojo) y leyendas de roles.
   - Estados de jugador: disponible, lesionado o sancionado.
+  - Renovaciones de contrato, rol prometido y promocion de cantera.
 - Club y mercado:
-  - Economia de club (presupuesto, ingresos/gastos base).
-  - Mercado de fichajes con operaciones de compra.
-  - Persistencia de estado de plantilla y club.
+  - Economia de club con libro financiero por categorias (sponsor, taquilla, salarios, fichajes, staff, infraestructura).
+  - Ajustes de club: tactica, foco de entrenamiento y precio de entradas.
+  - Mejoras de estadio y staff (medico y disciplina).
+  - Mercado de fichajes con listado de transferibles, compra/venta y ofertas entrantes/salientes.
+  - Persistencia completa del estado de carrera.
 
 ## Stack tecnico
 
@@ -72,7 +80,7 @@ src/
   components/      # UI reutilizable (tabla, noticias, resultados, escudos)
   data/            # datos semilla y bootstrap de ligas/equipos
   engine/          # logica de simulacion, plantilla, fichajes, persistencia
-  pages/           # vistas: games, dashboard, matchday, squad, club, promotions, transfers
+  pages/           # vistas: games, dashboard, calendar, finances, matchday, squad, club, promotions, transfers
   state/           # estado global del modo carrera
   types/           # modelos de dominio
 ```
