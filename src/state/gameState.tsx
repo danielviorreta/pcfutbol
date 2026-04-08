@@ -13,7 +13,7 @@ import {
   upgradeMedicalStaff,
   upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
-import { loadSaveStorage, saveSaveStorage, toGameSummaries } from '../engine/persistence'
+import { loadSaveStorage, parseSaveStorage, saveSaveStorage, serializeSaveStorage, toGameSummaries } from '../engine/persistence'
 import { playCurrentRound, sortLeagueTable } from '../engine/simulation'
 import { getOperationalCapacity } from '../engine/stadium'
 import {
@@ -72,6 +72,8 @@ interface GameContextValue {
   createGame: (input: CreateGameInput) => void
   selectGame: (gameId: string) => void
   deleteGame: (gameId: string) => void
+  exportSaves: () => string
+  importSaves: (raw: string) => boolean
   playRound: () => void
   prepareMatchPresentation: () => boolean
   confirmMatchPresentation: () => void
@@ -724,6 +726,44 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     persistCollection(nextGames, nextActive)
     setMatchPresentation(null)
     setNotice('Partida eliminada.')
+  }
+
+  const exportSaves = (): string => serializeSaveStorage({ games, activeGameId })
+
+  const importSaves = (raw: string): boolean => {
+    let parsedStorage
+
+    try {
+      parsedStorage = parseSaveStorage(raw)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo importar el archivo.'
+      setNotice(message)
+      return false
+    }
+
+    if (parsedStorage.games.length === 0) {
+      setNotice('El archivo no contiene partidas validas.')
+      return false
+    }
+
+    const mergedGames = new Map(games.map((item) => [item.id, item]))
+    parsedStorage.games.forEach((item) => {
+      mergedGames.set(item.id, item)
+    })
+
+    const nextGames = [...mergedGames.values()]
+    const nextActiveGameId =
+      parsedStorage.activeGameId && mergedGames.has(parsedStorage.activeGameId)
+        ? parsedStorage.activeGameId
+        : activeGameId && mergedGames.has(activeGameId)
+          ? activeGameId
+          : nextGames[0]?.id ?? null
+
+    persistCollection(nextGames, nextActiveGameId)
+    setMatchPresentation(null)
+    setNotice(`Importadas ${parsedStorage.games.length} partidas desde copia local.`)
+
+    return true
   }
 
   const setManagerName = (value: string) => {
@@ -1499,6 +1539,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     createGame,
     selectGame,
     deleteGame,
+    exportSaves,
+    importSaves,
     playRound,
     prepareMatchPresentation,
     confirmMatchPresentation,

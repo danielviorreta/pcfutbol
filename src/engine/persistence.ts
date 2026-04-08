@@ -2,9 +2,15 @@ import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } f
 import type { GameSummary, ManagerGameState } from '../types/game'
 import { PLAYER_REAL_AGES } from '../data/playerRealData'
 
-interface SaveStorage {
+export interface SaveStorage {
   games: ManagerGameState[]
   activeGameId: string | null
+}
+
+interface SaveExport {
+  version: 1
+  exportedAt: string
+  storage: SaveStorage
 }
 
 const STORAGE_KEY = 'pcfutbol-legacy-saves'
@@ -140,6 +146,20 @@ function persistStorage(storage: SaveStorage): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(storage))
 }
 
+function normalizeStorage(parsed: Partial<SaveStorage>): SaveStorage {
+  const games = Array.isArray(parsed.games)
+    ? parsed.games
+      .filter((game): game is ManagerGameState => isValidGame(game))
+      .map(normalizeGame)
+    : []
+  const activeGameId =
+    typeof parsed.activeGameId === 'string' && games.some((game) => game.id === parsed.activeGameId)
+      ? parsed.activeGameId
+      : games[0]?.id ?? null
+
+  return { games, activeGameId }
+}
+
 function normalizeSponsor(team: { division?: string; sponsor: { name: string; weeklyIncome: number; targetRank: number; seasonBonus: number; seasonBonusPaid: boolean } }): typeof team.sponsor {
   const isPrimera = team.division === 'Primera'
   const isSegunda = team.division === 'Segunda'
@@ -251,17 +271,7 @@ export function loadSaveStorage(): SaveStorage {
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as Partial<SaveStorage>
-      const games = Array.isArray(parsed.games)
-        ? parsed.games
-          .filter((game): game is ManagerGameState => isValidGame(game))
-          .map(normalizeGame)
-        : []
-      const activeGameId =
-        typeof parsed.activeGameId === 'string' && games.some((game) => game.id === parsed.activeGameId)
-          ? parsed.activeGameId
-          : games[0]?.id ?? null
-
-      return { games, activeGameId }
+      return normalizeStorage(parsed)
     } catch {
       return { games: [], activeGameId: null }
     }
@@ -298,6 +308,42 @@ export function loadSaveStorage(): SaveStorage {
 
 export function saveSaveStorage(storage: SaveStorage): void {
   persistStorage(storage)
+}
+
+export function serializeSaveStorage(storage: SaveStorage): string {
+  const payload: SaveExport = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    storage,
+  }
+
+  return JSON.stringify(payload, null, 2)
+}
+
+export function parseSaveStorage(raw: string): SaveStorage {
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(raw) as unknown
+  } catch {
+    throw new Error('El archivo no es un JSON valido.')
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Formato de guardado no compatible.')
+  }
+
+  const directStorage = parsed as Partial<SaveStorage>
+  if (Array.isArray(directStorage.games)) {
+    return normalizeStorage(directStorage)
+  }
+
+  const exportPayload = parsed as Partial<SaveExport>
+  if (!exportPayload.storage || typeof exportPayload.storage !== 'object') {
+    throw new Error('No se encontro ninguna partida en el archivo.')
+  }
+
+  return normalizeStorage(exportPayload.storage as Partial<SaveStorage>)
 }
 
 export function toGameSummaries(games: ManagerGameState[]): GameSummary[] {

@@ -1095,6 +1095,29 @@ h2 {
   color: var(--ink);
 }
 
+.save-backup-tools {
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.save-backup-tools h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.save-backup-tools p {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.84rem;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
 .save-list {
   display: grid;
   gap: 0.9rem;
