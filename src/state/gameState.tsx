@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState } from 'react'
-import { createInitialLeagueState } from '../data/seedData'
 import {
   applyWeeklyClubManagement,
   promoteYouthPlayer,
@@ -13,6 +12,8 @@ import {
   upgradeMedicalStaff,
   upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
+import { appendFinanceEntries, createFinanceEntry, getTeamBudget, mapBreakdownToEntries } from '../engine/finance'
+import { buildGame, getCurrentManagerFixture, getManagerTeam, mergeIncomingOffers, syncManagerLineup, syncManagerSquadOrder } from '../engine/gameUtils'
 import {
   buildGoalRecords,
   buildLineupWarning,
@@ -29,13 +30,9 @@ import {
   getDefaultLineup,
   getFormationSlots,
   isPlayerAvailable,
-  sanitizeLineupSelection,
 } from '../engine/squad'
 import { acceptIncomingTransferOffer, buyPlayer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
 import type {
-  FinanceCategory,
-  FinanceBreakdownItem,
-  FinanceEntry,
   GameSummary,
   IncomingTransferOffer,
   MatchPresentation,
@@ -102,121 +99,6 @@ interface GameContextValue {
 }
 
 const GameContext = createContext<GameContextValue | null>(null)
-const DEFAULT_SEASON_START_YEAR = 2025
-const MAX_FINANCE_ENTRIES = 160
-
-function createFinanceEntry(
-  round: number,
-  teamId: string,
-  category: FinanceCategory,
-  amount: number,
-  description: string,
-): FinanceEntry {
-  return {
-    id: `fin-${teamId}-${round}-${Math.round(Math.random() * 1_000_000)}`,
-    round,
-    teamId,
-    category,
-    amount,
-    description,
-  }
-}
-
-function appendFinanceEntries(prev: ManagerGameState, entries: FinanceEntry[]): FinanceEntry[] {
-  return [...entries.filter((entry) => entry.amount !== 0), ...(prev.financeEntries ?? [])].slice(0, MAX_FINANCE_ENTRIES)
-}
-
-function getTeamBudget(teams: Team[], teamId: string): number {
-  return teams.find((team) => team.id === teamId)?.budget ?? 0
-}
-
-function mapBreakdownToEntries(
-  round: number,
-  items: FinanceBreakdownItem[] | undefined,
-  managerTeamId: string,
-): FinanceEntry[] {
-  return (items ?? [])
-    .filter((item) => item.teamId === managerTeamId && item.amount !== 0)
-    .map((item) => createFinanceEntry(round, item.teamId, item.category, item.amount, item.description))
-}
-
-function getManagerTeam(game: ManagerGameState | null): Team | null {
-  if (!game) {
-    return null
-  }
-
-  return game.leagueState.teams.find((team) => team.id === game.managerTeamId) ?? game.leagueState.teams[0] ?? null
-}
-
-function buildGame(input: CreateGameInput): ManagerGameState {
-  const leagueState = createInitialLeagueState()
-  const managerTeam =
-    leagueState.teams.find((team) => team.id === input.managerTeamId) ?? leagueState.teams[0]
-  const now = new Date().toISOString()
-
-  return {
-    id: `game-${Date.now()}-${Math.round(Math.random() * 100_000)}`,
-    saveName: input.saveName.trim() || `${input.managerName.trim() || 'Mister'} - ${managerTeam.name}`,
-    createdAt: now,
-    updatedAt: now,
-    seasonStartYear: DEFAULT_SEASON_START_YEAR,
-    managerName: input.managerName.trim() || 'Mister',
-    managerTeamId: managerTeam.id,
-    managerLineup: getDefaultLineup(managerTeam),
-    managerSquadOrder: managerTeam.players.map((player) => player.id),
-    financeEntries: [],
-    pendingTransferOffers: [],
-    pendingOutgoingTransfers: [],
-    pendingRenewalOffers: [],
-    leagueState,
-  }
-}
-
-function mergeIncomingOffers(
-  currentOffers: IncomingTransferOffer[],
-  nextOffers: IncomingTransferOffer[],
-  managerTeam: Team | null,
-  currentRound: number,
-): IncomingTransferOffer[] {
-  const managerPlayerIds = new Set(managerTeam?.players.map((player) => player.id) ?? [])
-  const merged = [...currentOffers, ...nextOffers]
-  const deduped = new Map<string, IncomingTransferOffer>()
-
-  merged.forEach((offer) => {
-    if (!managerPlayerIds.has(offer.playerId)) {
-      return
-    }
-
-    if (currentRound - offer.createdRound > 2) {
-      return
-    }
-
-    deduped.set(`${offer.buyerTeamId}:${offer.playerId}`, offer)
-  })
-
-  return [...deduped.values()]
-}
-
-function getCurrentManagerFixture(game: ManagerGameState) {
-  return game.leagueState.fixtures.find(
-    (fixture) =>
-      fixture.round === game.leagueState.currentRound &&
-      !fixture.played &&
-      (fixture.homeTeamId === game.managerTeamId || fixture.awayTeamId === game.managerTeamId),
-  ) ?? null
-}
-
-function syncManagerLineup(team: Team, lineup: string[]): string[] {
-  return sanitizeLineupSelection(team, lineup)
-}
-
-function syncManagerSquadOrder(team: Team, order: string[]): string[] {
-  const validIds = new Set(team.players.map((player) => player.id))
-  const normalized = [...new Set(order)].filter((playerId) => validIds.has(playerId))
-  const missing = team.players.map((player) => player.id).filter((playerId) => !normalized.includes(playerId))
-
-  return [...normalized, ...missing]
-}
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const initialStorage = loadSaveStorage()
