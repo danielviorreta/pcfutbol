@@ -1,9 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState } from 'react'
 import {
-  applyWeeklyClubManagement,
   promoteYouthPlayer,
-  resolveRenewalOffers,
   submitRenewalOffer,
   setStadiumTicketPrice,
   setTeamTactic,
@@ -12,8 +10,9 @@ import {
   upgradeMedicalStaff,
   upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
-import { appendFinanceEntries, createFinanceEntry, getTeamBudget, mapBreakdownToEntries } from '../engine/finance'
-import { buildGame, getCurrentManagerFixture, getManagerTeam, mergeIncomingOffers, syncManagerLineup, syncManagerSquadOrder } from '../engine/gameUtils'
+import { appendFinanceEntries, createFinanceEntry, getTeamBudget } from '../engine/finance'
+import { buildGame, getCurrentManagerFixture, getManagerTeam, syncManagerLineup, syncManagerSquadOrder } from '../engine/gameUtils'
+import { processRound } from '../engine/roundProcessing'
 import {
   buildGoalRecords,
   buildLineupWarning,
@@ -24,14 +23,14 @@ import {
   buildMatchTacticalChanges,
 } from '../engine/matchPresentation'
 import { loadSaveStorage, parseSaveStorage, saveSaveStorage, serializeSaveStorage, toGameSummaries } from '../engine/persistence'
-import { playCurrentRound, sortLeagueTable } from '../engine/simulation'
+import { sortLeagueTable } from '../engine/simulation'
 import {
   canToggleInLineup,
   getDefaultLineup,
   getFormationSlots,
   isPlayerAvailable,
 } from '../engine/squad'
-import { acceptIncomingTransferOffer, buyPlayer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
+import { acceptIncomingTransferOffer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
 import type {
   GameSummary,
   IncomingTransferOffer,
@@ -233,97 +232,30 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const playRound = () => {
     updateActiveGame((prev) => {
-      const simulatedState = playCurrentRound(prev.leagueState, {
-        managerTeamId: prev.managerTeamId,
-        managerLineup: prev.managerLineup,
-      })
-      const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
+      const result = processRound(prev, prev.managerLineup)
 
-      const { nextState, headlines, incomingOffers, financeBreakdown } = applyWeeklyClubManagement(
-        simulatedState,
-        prev.managerTeamId,
-        prev.pendingTransferOffers,
-      )
-      const withWeeklyNews = {
-        ...nextState,
-        news: [...headlines, ...nextState.news].slice(0, 12),
+      if (result.renewalMessages.length > 0) {
+        setNotice(result.renewalMessages.join(' | '))
+      } else {
+        setNotice('Jornada completada. Partida guardada automaticamente.')
       }
-
-      const { nextState: afterRenewals, messages: renewalMessages, resolvedIds } = resolveRenewalOffers(
-        withWeeklyNews,
-        prev.managerTeamId,
-        prev.pendingRenewalOffers ?? [],
-      )
-
-      const nextManagerTeam =
-        afterRenewals.teams.find((team) => team.id === prev.managerTeamId) ?? afterRenewals.teams[0]
-      const pendingTransferOffers = mergeIncomingOffers(
-        prev.pendingTransferOffers,
-        incomingOffers,
-        nextManagerTeam,
-        afterRenewals.currentRound,
-      )
-
-      if (renewalMessages.length > 0) {
-        setNotice(renewalMessages.join(' | '))
-      }
-
-      const resolvedRenewalOffers = (prev.pendingRenewalOffers ?? []).filter((o) => resolvedIds.includes(o.id))
-
-      // Resolve outgoing transfer offers submitted in a previous round
-      const dueOutgoing = prev.pendingOutgoingTransfers.filter(
-        (o) => o.createdRound < afterRenewals.currentRound,
-      )
-      let stateAfterOutgoing = afterRenewals
-      const outgoingFinanceEntries: ReturnType<typeof createFinanceEntry>[] = []
-      for (const pending of dueOutgoing) {
-        const { nextState: afterBuy, message, ok } = buyPlayer(
-          stateAfterOutgoing,
-          prev.managerTeamId,
-          pending.playerId,
-          pending.wageOffer,
-          pending.signingBonus,
-          pending.contractYears,
-          pending.promisedRole,
-          pending.transferFee,
-        )
-        if (ok) {
-          stateAfterOutgoing = afterBuy
-          const spent = pending.transferFee + pending.signingBonus
-          outgoingFinanceEntries.push(
-            createFinanceEntry(afterRenewals.currentRound, prev.managerTeamId, 'transfer-in', -spent, `Fichaje de ${pending.playerName}`),
-          )
-          setNotice(`${pending.playerName} ha llegado a tu equipo.`)
-        } else {
-          setNotice(message)
-        }
-      }
-      const resolvedOutgoingIds = new Set(dueOutgoing.map((o) => o.id))
-      const nextManagerTeamFinal =
-        stateAfterOutgoing.teams.find((team) => team.id === prev.managerTeamId) ?? stateAfterOutgoing.teams[0]
-
-      const financeEntries = appendFinanceEntries(prev, [
-        ...mapBreakdownToEntries(prev.leagueState.currentRound, simulatedState.financeBreakdown, prev.managerTeamId),
-        ...mapBreakdownToEntries(prev.leagueState.currentRound, financeBreakdown, prev.managerTeamId),
-        ...resolvedRenewalOffers.map((offer) => createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'renewal', -offer.signingBonus, `Renovación de ${offer.playerName}`)),
-        ...outgoingFinanceEntries,
-      ])
 
       return {
         ...prev,
-        seasonStartYear: seasonRolledOver ? prev.seasonStartYear + 1 : prev.seasonStartYear,
-        financeEntries,
-        leagueState: stateAfterOutgoing,
-        pendingTransferOffers,
-        pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
-        pendingOutgoingTransfers: prev.pendingOutgoingTransfers.filter((o) => !resolvedOutgoingIds.has(o.id)),
-        managerLineup: syncManagerLineup(nextManagerTeamFinal, prev.managerLineup),
-        managerSquadOrder: syncManagerSquadOrder(nextManagerTeamFinal, prev.managerSquadOrder),
+        seasonStartYear: result.seasonRolledOver ? prev.seasonStartYear + 1 : prev.seasonStartYear,
+        financeEntries: result.financeEntries,
+        leagueState: result.stateAfterOutgoing,
+        pendingTransferOffers: result.pendingTransferOffers,
+        pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter(
+          (o) => !result.resolvedRenewalOffers.some(resolved => resolved.id === o.id)
+        ),
+        pendingOutgoingTransfers: prev.pendingOutgoingTransfers.filter(
+          (o) => !result.resolvedOutgoingIds.has(o.id)
+        ),
+        managerLineup: syncManagerLineup(result.nextManagerTeamFinal, prev.managerLineup),
+        managerSquadOrder: syncManagerSquadOrder(result.nextManagerTeamFinal, prev.managerSquadOrder),
       }
     })
-    if (!game?.pendingRenewalOffers?.length) {
-      setNotice('Jornada completada. Partida guardada automaticamente.')
-    }
   }
 
   const prepareMatchPresentation = (): boolean => {
@@ -395,89 +327,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const simulatedState = playCurrentRound(game.leagueState, {
-      managerTeamId: game.managerTeamId,
-      managerLineup: game.managerLineup,
-    })
-    const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
-
-    const { nextState, headlines, incomingOffers, financeBreakdown } = applyWeeklyClubManagement(
-      simulatedState,
-      game.managerTeamId,
-      game.pendingTransferOffers,
-    )
-    const withWeeklyNews = {
-      ...nextState,
-      news: [...headlines, ...nextState.news].slice(0, 12),
-    }
-
-    const { nextState: afterRenewals, messages: renewalMessages, resolvedIds } = resolveRenewalOffers(
-      withWeeklyNews,
-      game.managerTeamId,
-      game.pendingRenewalOffers ?? [],
-    )
-
-    const nextManagerTeam =
-      afterRenewals.teams.find((team) => team.id === game.managerTeamId) ?? afterRenewals.teams[0]
-    const pendingTransferOffers = mergeIncomingOffers(
-      game.pendingTransferOffers,
-      incomingOffers,
-      nextManagerTeam,
-      afterRenewals.currentRound,
-    )
-    const resolvedRenewalOffers = (game.pendingRenewalOffers ?? []).filter((o) => resolvedIds.includes(o.id))
-
-    // Resolve outgoing transfer offers submitted in a previous round
-    const dueOutgoing = game.pendingOutgoingTransfers.filter(
-      (o) => o.createdRound < afterRenewals.currentRound,
-    )
-    let stateAfterOutgoing = afterRenewals
-    const outgoingFinanceEntries: ReturnType<typeof createFinanceEntry>[] = []
-    let outgoingNotice = ''
-    for (const pending of dueOutgoing) {
-      const { nextState: afterBuy, message, ok } = buyPlayer(
-        stateAfterOutgoing,
-        game.managerTeamId,
-        pending.playerId,
-        pending.wageOffer,
-        pending.signingBonus,
-        pending.contractYears,
-        pending.promisedRole,
-        pending.transferFee,
-      )
-      if (ok) {
-        stateAfterOutgoing = afterBuy
-        const spent = pending.transferFee + pending.signingBonus
-        outgoingFinanceEntries.push(
-          createFinanceEntry(afterRenewals.currentRound, game.managerTeamId, 'transfer-in', -spent, `Fichaje de ${pending.playerName}`),
-        )
-        outgoingNotice = `${pending.playerName} ha llegado a tu equipo.`
-      } else {
-        outgoingNotice = message
-      }
-    }
-    const resolvedOutgoingIds = new Set(dueOutgoing.map((o) => o.id))
-    const nextManagerTeamFinal =
-      stateAfterOutgoing.teams.find((team) => team.id === game.managerTeamId) ?? stateAfterOutgoing.teams[0]
-
-    const financeEntries = appendFinanceEntries(game, [
-      ...mapBreakdownToEntries(game.leagueState.currentRound, simulatedState.financeBreakdown, game.managerTeamId),
-      ...mapBreakdownToEntries(game.leagueState.currentRound, financeBreakdown, game.managerTeamId),
-      ...resolvedRenewalOffers.map((offer) => createFinanceEntry(game.leagueState.currentRound, game.managerTeamId, 'renewal', -offer.signingBonus, `Renovación de ${offer.playerName}`)),
-      ...outgoingFinanceEntries,
-    ])
+    const result = processRound(game, game.managerLineup)
 
     const nextGame: ManagerGameState = {
       ...game,
       updatedAt: new Date().toISOString(),
-      seasonStartYear: seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
-      financeEntries,
-      leagueState: stateAfterOutgoing,
-      pendingTransferOffers,
-      pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter((o) => !resolvedIds.includes(o.id)),
-      pendingOutgoingTransfers: game.pendingOutgoingTransfers.filter((o) => !resolvedOutgoingIds.has(o.id)),
-      managerLineup: syncManagerLineup(nextManagerTeamFinal, game.managerLineup),
-      managerSquadOrder: syncManagerSquadOrder(nextManagerTeamFinal, game.managerSquadOrder),
+      seasonStartYear: result.seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
+      financeEntries: result.financeEntries,
+      leagueState: result.stateAfterOutgoing,
+      pendingTransferOffers: result.pendingTransferOffers,
+      pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter(
+        (o) => !result.resolvedRenewalOffers.some(resolved => resolved.id === o.id)
+      ),
+      pendingOutgoingTransfers: game.pendingOutgoingTransfers.filter(
+        (o) => !result.resolvedOutgoingIds.has(o.id)
+      ),
+      managerLineup: syncManagerLineup(result.nextManagerTeamFinal, game.managerLineup),
+      managerSquadOrder: syncManagerSquadOrder(result.nextManagerTeamFinal, game.managerSquadOrder),
     }
 
     const nextGames = games.map((candidate) =>
@@ -486,34 +352,34 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     persistCollection(nextGames, nextGame.id)
     const noticeParts = [
-      ...(renewalMessages.length > 0 ? renewalMessages : ['Jornada completada. Partida guardada automaticamente.']),
-      ...(outgoingNotice ? [outgoingNotice] : []),
+      ...(result.renewalMessages.length > 0 ? result.renewalMessages : ['Jornada completada. Partida guardada automaticamente.']),
+      ...(result.outgoingNotice ? [result.outgoingNotice] : []),
     ]
     setNotice(noticeParts.join(' | '))
 
-    const result = stateAfterOutgoing.lastResults.find((item) => item.fixtureId === matchPresentation.fixtureId)
-    const homeTeamAfterMatch = stateAfterOutgoing.teams.find((team) => team.id === matchPresentation.homeTeamId)
-    const awayTeamAfterMatch = stateAfterOutgoing.teams.find((team) => team.id === matchPresentation.awayTeamId)
-    const stats = result
+    const matchResult = result.stateAfterOutgoing.lastResults.find((item) => item.fixtureId === matchPresentation.fixtureId)
+    const homeTeamAfterMatch = result.stateAfterOutgoing.teams.find((team) => team.id === matchPresentation.homeTeamId)
+    const awayTeamAfterMatch = result.stateAfterOutgoing.teams.find((team) => team.id === matchPresentation.awayTeamId)
+    const stats = matchResult
       ? buildMatchStats(
         homeTeamBeforeMatch,
         awayTeamBeforeMatch,
         matchPresentation.homeLineup,
         matchPresentation.awayLineup,
-        result.homeGoals,
-        result.awayGoals,
+        matchResult.homeGoals,
+        matchResult.awayGoals,
       )
       : undefined
-    const goals = result
+    const goals = matchResult
       ? [
-        ...buildGoalRecords(homeTeamBeforeMatch, matchPresentation.homeLineup, result.homeGoals, homeTeamBeforeMatch.id),
-        ...buildGoalRecords(awayTeamBeforeMatch, matchPresentation.awayLineup, result.awayGoals, awayTeamBeforeMatch.id, 4),
+        ...buildGoalRecords(homeTeamBeforeMatch, matchPresentation.homeLineup, matchResult.homeGoals, homeTeamBeforeMatch.id),
+        ...buildGoalRecords(awayTeamBeforeMatch, matchPresentation.awayLineup, matchResult.awayGoals, awayTeamBeforeMatch.id, 4),
       ].sort((a, b) => a.minute - b.minute)
       : undefined
-    const incidents = result && homeTeamAfterMatch && awayTeamAfterMatch
+    const incidents = matchResult && homeTeamAfterMatch && awayTeamAfterMatch
       ? buildMatchIncidents(homeTeamBeforeMatch, awayTeamBeforeMatch, homeTeamAfterMatch, awayTeamAfterMatch)
       : undefined
-    const substitutions = result && incidents
+    const substitutions = matchResult && incidents
       ? buildMatchSubstitutions(
         homeTeamBeforeMatch,
         awayTeamBeforeMatch,
@@ -522,15 +388,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         incidents,
       )
       : undefined
-    const tacticalChanges = result
-      ? buildMatchTacticalChanges(homeTeamBeforeMatch, awayTeamBeforeMatch, result.homeGoals, result.awayGoals)
+    const tacticalChanges = matchResult
+      ? buildMatchTacticalChanges(homeTeamBeforeMatch, awayTeamBeforeMatch, matchResult.homeGoals, matchResult.awayGoals)
       : undefined
-    const commentary = result && stats && goals
+    const commentary = matchResult && stats && goals
       ? buildMatchCommentary(
         homeTeamBeforeMatch,
         awayTeamBeforeMatch,
-        result.homeGoals,
-        result.awayGoals,
+        matchResult.homeGoals,
+        matchResult.awayGoals,
         stats,
         goals,
         incidents ?? [],
@@ -542,7 +408,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setMatchPresentation({
       ...matchPresentation,
       phase: 'result',
-      result,
+      result: matchResult,
       stats,
       commentary,
       goals,
