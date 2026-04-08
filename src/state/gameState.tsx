@@ -6,12 +6,12 @@ import {
   setStadiumTicketPrice,
   setTeamTactic,
   setTeamTrainingFocus,
-  upgradeDisciplineStaff,
-  upgradeMedicalStaff,
   upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
 import { appendFinanceEntries, createFinanceEntry, getTeamBudget } from '../engine/finance'
 import { buildGame, getCurrentManagerFixture, getManagerTeam, syncManagerLineup, syncManagerSquadOrder } from '../engine/gameUtils'
+import { performStaffUpgrade } from '../engine/staffUpgrades'
+import { validatePlayerPurchase } from '../engine/purchaseValidation'
 import { processRound } from '../engine/roundProcessing'
 import {
   buildGoalRecords,
@@ -542,47 +542,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     feeOffer?: number,
   ) => {
     updateActiveGame((prev) => {
-      if (prev.pendingOutgoingTransfers.some((o) => o.playerId === playerId)) {
-        setNotice('Ya hay una oferta pendiente para este jugador.')
-        return prev
-      }
-
-      const sellerTeam = prev.leagueState.teams.find((team) =>
-        team.id !== prev.managerTeamId && team.players.some((p) => p.id === playerId),
-      )
-      const player = sellerTeam?.players.find((p) => p.id === playerId)
-
-      if (!sellerTeam || !player) {
-        setNotice('El jugador ya no está disponible.')
-        return prev
-      }
-
-      const transferFee = feeOffer ?? (player.transferListed
-        ? Math.max(100_000, Math.round(player.askingPrice))
-        : player.releaseClause)
-
-      const totalCost = transferFee + signingBonus
-      const budget = getTeamBudget(prev.leagueState.teams, prev.managerTeamId)
-      if (budget < totalCost) {
-        setNotice('Presupuesto insuficiente para esta oferta.')
-        return prev
-      }
-
-      const offer: PendingOutgoingTransferOffer = {
-        id: `out-${playerId}-${prev.leagueState.currentRound}`,
+      const validation = validatePlayerPurchase(
         playerId,
-        playerName: player.name,
-        sellerTeamId: sellerTeam.id,
-        sellerTeamName: sellerTeam.name,
-        transferFee,
         wageOffer,
         signingBonus,
         contractYears,
         promisedRole,
-        createdRound: prev.leagueState.currentRound,
+        feeOffer,
+        prev.leagueState,
+        prev.managerTeamId,
+        prev.pendingOutgoingTransfers,
+      )
+
+      if (!validation.valid) {
+        setNotice(validation.error ?? 'No se pudo procesar la oferta.')
+        return prev
       }
 
-      setNotice(`Oferta enviada por ${player.name}. El club responderá en la próxima jornada.`)
+      const offer = validation.offer!
+      setNotice(`Oferta enviada por ${offer.playerName}. El club responderá en la próxima jornada.`)
       return {
         ...prev,
         pendingOutgoingTransfers: [...prev.pendingOutgoingTransfers, offer],
@@ -807,38 +785,48 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const improveMedicalStaff = () => {
     updateActiveGame((prev) => {
-      const { nextState, message, ok } = upgradeMedicalStaff(prev.leagueState, prev.managerTeamId)
-      setNotice(message)
-      if (!ok) {
+      const result = performStaffUpgrade(prev, 'medical')
+      setNotice(result.message)
+      if (!result.success || !result.nextLeagueState) {
         return prev
       }
 
-      const cost = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
       return {
         ...prev,
+        leagueState: result.nextLeagueState,
         financeEntries: appendFinanceEntries(prev, [
-          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'staff', -cost, 'Mejora de cuerpo médico'),
+          createFinanceEntry(
+            prev.leagueState.currentRound,
+            prev.managerTeamId,
+            'staff',
+            -(result.cost ?? 0),
+            'Mejora de cuerpo médico',
+          ),
         ]),
-        leagueState: nextState,
       }
     })
   }
 
   const improveDisciplineStaff = () => {
     updateActiveGame((prev) => {
-      const { nextState, message, ok } = upgradeDisciplineStaff(prev.leagueState, prev.managerTeamId)
-      setNotice(message)
-      if (!ok) {
+      const result = performStaffUpgrade(prev, 'discipline')
+      setNotice(result.message)
+      if (!result.success || !result.nextLeagueState) {
         return prev
       }
 
-      const cost = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
       return {
         ...prev,
+        leagueState: result.nextLeagueState,
         financeEntries: appendFinanceEntries(prev, [
-          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'staff', -cost, 'Mejora de disciplina'),
+          createFinanceEntry(
+            prev.leagueState.currentRound,
+            prev.managerTeamId,
+            'staff',
+            -(result.cost ?? 0),
+            'Mejora de disciplina',
+          ),
         ]),
-        leagueState: nextState,
       }
     })
   }
