@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createInitialLeagueState } from '../data/seedData'
 import { useGame } from '../state/gameState'
@@ -12,9 +12,10 @@ function formatDate(value: string): string {
 }
 
 export function GamesPage() {
-  const { game, savedGames, createGame, selectGame, deleteGame } = useGame()
+  const { game, savedGames, createGame, selectGame, deleteGame, exportSaves, importSaves } = useGame()
   const navigate = useNavigate()
   const clubs = useMemo(() => createInitialLeagueState().teams, [])
+  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   const [saveName, setSaveName] = useState('Carrera 1')
   const [managerName, setManagerName] = useState('Mister')
@@ -30,6 +31,36 @@ export function GamesPage() {
   const loadGame = (gameId: string) => {
     selectGame(gameId)
     navigate('/dashboard')
+  }
+
+  const handleExport = () => {
+    const content = exportSaves()
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    const blob = new Blob([content], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `pcfutbol-backup-${timestamp}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const triggerImport = () => {
+    importInputRef.current?.click()
+  }
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const raw = await file.text()
+    importSaves(raw)
+    event.target.value = ''
   }
 
   return (
@@ -63,6 +94,21 @@ export function GamesPage() {
           )}
           <button type="submit">Crear Carrera</button>
         </form>
+        <div className="save-backup-tools">
+          <h3>Copia De Seguridad</h3>
+          <p>Exporta tus partidas a un archivo para recuperarlas aunque el navegador se reinicie.</p>
+          <div className="actions compact-actions">
+            <button type="button" className="secondary" onClick={handleExport}>Exportar partidas</button>
+            <button type="button" className="secondary" onClick={triggerImport}>Importar copia</button>
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={handleImportFile}
+            className="hidden-file-input"
+          />
+        </div>
       </article>
 
       <article className="panel full-span">
