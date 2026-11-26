@@ -26,7 +26,7 @@ describe('finance', () => {
     const entries = mapBreakdownToEntries(3, [
       { teamId: 'mgr', category: 'ticketing', amount: 100, description: 'gate' },
       { teamId: 'other', category: 'ticketing', amount: 100, description: 'gate' },
-      { teamId: 'mgr', category: 'wages', amount: 0, description: 'none' },
+      { teamId: 'mgr', category: 'salary', amount: 0, description: 'none' },
     ], 'mgr')
 
     expect(entries).toHaveLength(1)
