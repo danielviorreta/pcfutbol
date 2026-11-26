@@ -1,4 +1,5 @@
 /** Weekly club management: training, AI market, finances and season rollover. */
+import { applySeasonPlayerChanges } from './seasonPlayers'
 import { buildSeasonFixtures } from '../fixtures'
 import { simulateAiContractRenewals, simulateAiTransferWindow } from '../transfers'
 import { weeklyPayroll, UPGRADE_SEATS, MAX_CAPACITY } from './helpers'
@@ -130,7 +131,10 @@ export function applyWeeklyClubManagement(
       const { teams: transitionedTeams, headlines: transitionHeadlines, bracket } = applyPromotionRelegation(nextTeams)
       headlines.push(...transitionHeadlines)
 
-      const resetTeams = transitionedTeams.map(resetSeasonStats)
+      const seasonChanges = applySeasonPlayerChanges(transitionedTeams, managerTeamId)
+      headlines.push(...seasonChanges.headlines)
+
+      const resetTeams = seasonChanges.teams.map(resetSeasonStats)
       const { fixtures, totalRounds } = buildSeasonFixtures(resetTeams)
 
       return {

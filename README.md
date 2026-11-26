@@ -61,6 +61,7 @@ Además del guardado automático en navegador, ya incluye copia de seguridad man
   - Indicadores de ajuste posicional (verde/naranja/rojo) y leyendas de roles.
   - Estados de jugador: disponible, lesionado o sancionado.
   - Renovaciones de contrato, rol prometido y promocion de cantera.
+  - Fin de temporada: los jugadores cumplen años, progresan o declinan con la edad, los contratos vencen (agentes libres), los veteranos se retiran y las plantillas se completan con la cantera.
 - Club y mercado:
   - Economia de club con libro financiero por categorias (sponsor, taquilla, salarios, fichajes, staff, infraestructura).
   - Ajustes de club: tactica, foco de entrenamiento y precio de entradas.
