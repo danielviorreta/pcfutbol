@@ -62,6 +62,7 @@ interface GameContextValue {
   pendingRenewalOffers: PendingRenewalOffer[]
   savedGames: GameSummary[]
   notice: string | null
+  storageError: string | null
   setManagerName: (value: string) => void
   setSaveName: (value: string) => void
   createGame: (input: CreateGameInput) => void
@@ -100,10 +101,11 @@ interface GameContextValue {
 const GameContext = createContext<GameContextValue | null>(null)
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const initialStorage = loadSaveStorage()
+  const [initialStorage] = useState(loadSaveStorage)
   const [games, setGames] = useState<ManagerGameState[]>(initialStorage.games)
   const [activeGameId, setActiveGameId] = useState<string | null>(initialStorage.activeGameId)
   const [notice, setNotice] = useState<string | null>(null)
+  const [storageError, setStorageError] = useState<string | null>(null)
   const [matchPresentation, setMatchPresentation] = useState<MatchPresentation | null>(null)
 
   const game = useMemo(
@@ -135,7 +137,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const savedGames = useMemo(() => toGameSummaries(games), [games])
 
   const persistCollection = (nextGames: ManagerGameState[], nextActiveGameId: string | null) => {
-    saveSaveStorage({ games: nextGames, activeGameId: nextActiveGameId })
+    // Only games whose object changed need rewriting; unchanged ones keep the same reference.
+    const previousById = new Map(games.map((item) => [item.id, item]))
+    const changedIds = nextGames.filter((item) => previousById.get(item.id) !== item).map((item) => item.id)
+    const result = saveSaveStorage({ games: nextGames, activeGameId: nextActiveGameId }, changedIds)
+    setStorageError(result.ok ? null : result.error)
     setGames(nextGames)
     setActiveGameId(nextActiveGameId)
   }
@@ -845,6 +851,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     pendingOutgoingTransfers: game?.pendingOutgoingTransfers ?? [],
     savedGames,
     notice,
+    storageError,
     setManagerName,
     setSaveName,
     createGame,

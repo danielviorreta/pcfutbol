@@ -2,7 +2,7 @@ import { createInitialLeagueState } from '../data/seedData'
 import { getDefaultLineup, sanitizeLineupSelection } from './squad'
 import type { Fixture, IncomingTransferOffer, ManagerGameState, Team } from '../types/game'
 
-const DEFAULT_SEASON_START_YEAR = 2025
+const DEFAULT_SEASON_START_YEAR = 2026
 
 interface CreateGameInput {
   saveName: string
