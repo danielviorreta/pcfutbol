@@ -1,7 +1,7 @@
 {
   "name": "pcfutbol",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "homepage": "https://danielviorreta.github.io/pcfutbol",
   "type": "module",
   "scripts": {

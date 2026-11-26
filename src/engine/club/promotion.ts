@@ -115,6 +115,29 @@ function simulateTwoLegTie(label: string, higherSeed: Team, lowerSeed: Team): { 
   }
 }
 
+/**
+ * Promoted clubs can come from either Primera Federacion group, while relegated
+ * clubs join their regional group, so group sizes can drift. Move newly
+ * relegated clubs (then any club) from the larger group until both are equal.
+ */
+function balanceFederacionGroups(teams: Team[], newlyRelegatedIds: Set<string>): void {
+  const inGroup = (group: 'Grupo 1' | 'Grupo 2') =>
+    teams.filter((team) => team.division === 'Primera Federacion' && team.group === group)
+
+  for (;;) {
+    const groupOne = inGroup('Grupo 1')
+    const groupTwo = inGroup('Grupo 2')
+    if (Math.abs(groupOne.length - groupTwo.length) <= 1) {
+      return
+    }
+    const [larger, target] = groupOne.length > groupTwo.length
+      ? [groupOne, 'Grupo 2' as const]
+      : [groupTwo, 'Grupo 1' as const]
+    const mover = larger.find((team) => newlyRelegatedIds.has(team.id)) ?? larger[larger.length - 1]
+    mover.group = target
+  }
+}
+
 export function applyPromotionRelegation(teams: Team[]): { teams: Team[]; headlines: string[]; bracket: LeagueState['promotionBracket'] } {
   const primera = rankDivisionTeams(teams.filter((team) => team.division === 'Primera'))
   const segunda = rankDivisionTeams(teams.filter((team) => team.division === 'Segunda'))
@@ -215,6 +238,7 @@ export function applyPromotionRelegation(teams: Team[]): { teams: Team[]; headli
       group,
     }
   })
+  balanceFederacionGroups(transitioned, relegatedSegundaIds)
 
   const headlines = [
     segundaPlayoffTeams.length > 0
