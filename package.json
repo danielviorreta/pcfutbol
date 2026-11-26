@@ -2,7 +2,7 @@
   "name": "pcfutbol",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://dviorreta.github.io/pcfutbol",
+  "homepage": "https://danielviorreta.github.io/pcfutbol",
   "type": "module",
   "scripts": {
     "dev": "vite",
