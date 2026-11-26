@@ -42,6 +42,14 @@ export interface Player {
   yellowCards: number
   contractYears: number
   recentMinutes?: number[]
+  /** Current-season league stats; missing on saves from before they were tracked. */
+  seasonStats?: PlayerSeasonStats
+}
+
+export interface PlayerSeasonStats {
+  appearances: number
+  goals: number
+  assists: number
 }
 
 export interface YouthPlayer {
@@ -144,6 +152,38 @@ export interface MatchResult {
   awayTeamId: string
   homeGoals: number
   awayGoals: number
+  /** Who scored and assisted each goal, in match order. */
+  goals?: MatchGoalEvent[]
+}
+
+export interface MatchGoalEvent {
+  teamId: string
+  scorerId: string
+  assistId?: string
+}
+
+export interface SeasonLeader {
+  playerName: string
+  teamName: string
+  value: number
+}
+
+export interface CompetitionSeasonRecord {
+  competition: string
+  champion: string
+  topScorer: SeasonLeader | null
+  topAssister: SeasonLeader | null
+}
+
+export interface SeasonRecord {
+  /** e.g. "2026/27"; filled in when the record is stored on the game. */
+  label: string
+  competitions: CompetitionSeasonRecord[]
+  promoted: string[]
+  relegated: string[]
+  managerTeamName: string
+  managerCompetition: string
+  managerPosition: number
 }
 
 export interface PendingRenewalOffer {
@@ -297,6 +337,8 @@ export interface LeagueState {
   news: string[]
   promotionSummary: string[]
   promotionBracket: PromotionBracket | null
+  /** Completed seasons, oldest first. */
+  seasonHistory?: SeasonRecord[]
 }
 
 export interface ManagerGameState {

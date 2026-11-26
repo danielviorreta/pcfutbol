@@ -351,8 +351,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       : undefined
     const goals = matchResult
       ? [
-        ...buildGoalRecords(homeTeamBeforeMatch, matchPresentation.homeLineup, matchResult.homeGoals, homeTeamBeforeMatch.id),
-        ...buildGoalRecords(awayTeamBeforeMatch, matchPresentation.awayLineup, matchResult.awayGoals, awayTeamBeforeMatch.id, 4),
+        ...buildGoalRecords(homeTeamBeforeMatch, matchPresentation.homeLineup, matchResult.homeGoals, homeTeamBeforeMatch.id, 0, matchResult.goals),
+        ...buildGoalRecords(awayTeamBeforeMatch, matchPresentation.awayLineup, matchResult.awayGoals, awayTeamBeforeMatch.id, 4, matchResult.goals),
       ].sort((a, b) => a.minute - b.minute)
       : undefined
     const incidents = matchResult && homeTeamAfterMatch && awayTeamAfterMatch

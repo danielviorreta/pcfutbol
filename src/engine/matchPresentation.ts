@@ -8,8 +8,7 @@ import type {
   MatchSubstitutionRecord,
   MatchTacticalChangeRecord,
   Player,
-  Team,
-} from '../types/game'
+  Team, MatchGoalEvent } from '../types/game'
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
@@ -130,8 +129,22 @@ export function buildGoalRecords(
   totalGoals: number,
   teamId: string,
   minuteOffset = 0,
+  events?: MatchGoalEvent[],
 ): MatchGoalRecord[] {
   const minutes = buildGoalMinutes(totalGoals).map((minute) => minute + minuteOffset)
+
+  // Use the scorers the simulation picked when available, so the screen matches the stats.
+  const teamEvents = events?.filter((event) => event.teamId === teamId) ?? []
+  if (teamEvents.length === totalGoals && totalGoals > 0) {
+    const nameOf = (id?: string) => (id ? team.players.find((player) => player.id === id)?.name : undefined)
+    return minutes.map((minute, index) => ({
+      minute,
+      teamId,
+      scorer: nameOf(teamEvents[index].scorerId) ?? pickLineupName(team, lineup, 8),
+      assist: nameOf(teamEvents[index].assistId),
+    }))
+  }
+
   const attackers = getAttackingPool(team, lineup)
 
   return minutes.map((minute, index) => {

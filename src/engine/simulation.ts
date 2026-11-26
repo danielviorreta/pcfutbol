@@ -1,5 +1,5 @@
 import { random } from './random'
-import type { FinanceBreakdownItem, Fixture, LeagueState, MatchResult, Player, Team } from '../types/game'
+import type { FinanceBreakdownItem, Fixture, LeagueState, MatchGoalEvent, MatchResult, Player, Team } from '../types/game'
 import { getOperationalCapacity } from './stadium'
 import { getDefaultLineup, getTeamRatings, isPlayerAvailable, normalizeLineup } from './squad'
 
@@ -71,13 +71,33 @@ function getInjuryDuration(fatigue: number): number {
   return 1 + Math.floor(random() * 3)
 }
 
+/** Expected goals per half for a typical matchup; calibrated to ~2.6 goals per match. */
+const BASE_HALF_GOALS = 0.72
+/**
+ * Typical attack-minus-defense gap: defense also includes the opponent's
+ * midfield, so an even matchup sits well below zero. Centring here keeps
+ * BASE_HALF_GOALS meaningful.
+ */
+const TYPICAL_EDGE = -55
+/** How strongly the edge moves expected goals (larger = more even matches). */
+const EDGE_SCALE = 55
+
+/** Poisson sample (Knuth): realistic scorelines, including the occasional 0-0 or 4-1. */
+function samplePoisson(lambda: number): number {
+  const limit = Math.exp(-lambda)
+  let product = random()
+  let count = 0
+  while (product > limit) {
+    count += 1
+    product *= random()
+  }
+  return count
+}
+
 function sampleHalfGoals(offenseScore: number, defenseScore: number, tempo = 1): number {
   const edge = offenseScore - defenseScore
-  // Softer edge scaling avoids over-penalizing attacks against slightly stronger defenses.
-  const base = 0.68 + edge / 220
-  const withVariance = base * tempo + (random() * 0.9 - 0.45)
-
-  return clamp(Math.round(withVariance), 0, 4)
+  const expected = clamp(BASE_HALF_GOALS * Math.exp((edge - TYPICAL_EDGE) / EDGE_SCALE) * tempo, 0.1, 2.4)
+  return clamp(samplePoisson(expected), 0, 4)
 }
 
 function getLineupPlayers(team: Team, lineup: string[]): Player[] {
@@ -159,6 +179,45 @@ function getLineupForTeam(team: Team, options: PlayRoundOptions): string[] {
   return getDefaultLineup(team)
 }
 
+const SCORING_WEIGHT: Record<Player['position'], number> = { GK: 0, DEF: 1, MID: 3, FWD: 7 }
+const ASSIST_WEIGHT: Record<Player['position'], number> = { GK: 0.1, DEF: 1.5, MID: 4, FWD: 3 }
+const ASSIST_CHANCE = 0.8
+
+function pickWeighted(players: Player[], weight: (player: Player) => number): Player | undefined {
+  const total = players.reduce((sum, player) => sum + weight(player), 0)
+  if (total <= 0) {
+    return players[0]
+  }
+  let roll = random() * total
+  for (const player of players) {
+    roll -= weight(player)
+    if (roll < 0) {
+      return player
+    }
+  }
+  return players[players.length - 1]
+}
+
+/** Picks scorer and assist for each goal from the lineup, favouring forwards and better players. */
+function pickGoalEvents(team: Team, lineup: string[], goals: number): MatchGoalEvent[] {
+  const onPitch = lineup
+    .map((id) => team.players.find((player) => player.id === id))
+    .filter((player): player is Player => Boolean(player))
+  if (onPitch.length === 0) {
+    return []
+  }
+
+  // Squared so the best finishers take a realistic share of the goals.
+  const quality = (player: Player) => Math.max(1, player.overall - 45) ** 2
+  return Array.from({ length: goals }, () => {
+    const scorer = pickWeighted(onPitch, (player) => SCORING_WEIGHT[player.position] * quality(player))!
+    const assister = random() < ASSIST_CHANCE
+      ? pickWeighted(onPitch.filter((player) => player.id !== scorer.id), (player) => ASSIST_WEIGHT[player.position] * quality(player))
+      : undefined
+    return { teamId: team.id, scorerId: scorer.id, assistId: assister?.id }
+  })
+}
+
 function getMatchPack(
   fixture: Fixture,
   teamsById: Map<string, Team>,
@@ -220,6 +279,10 @@ function getMatchPack(
       awayTeamId: fixture.awayTeamId,
       homeGoals,
       awayGoals,
+      goals: [
+        ...pickGoalEvents(homeTeam, homeLineup, homeGoals),
+        ...pickGoalEvents(awayTeam, awayLineup, awayGoals),
+      ],
     },
   }
 }
@@ -329,7 +392,17 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
     suspensions: [],
   }
 
+  const goalsByPlayer = new Map<string, number>()
+  const assistsByPlayer = new Map<string, number>()
+  const bump = (map: Map<string, number>, id: string) => map.set(id, (map.get(id) ?? 0) + 1)
+
   for (const pack of packs) {
+    for (const goal of pack.result.goals ?? []) {
+      bump(goalsByPlayer, goal.scorerId)
+      if (goal.assistId) {
+        bump(assistsByPlayer, goal.assistId)
+      }
+    }
     lineupsByTeam.set(pack.fixture.homeTeamId, pack.homeLineup)
     lineupsByTeam.set(pack.fixture.awayTeamId, pack.awayLineup)
 
@@ -449,6 +522,11 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
           suspensionWeeks,
           yellowCards,
           recentMinutes: pushRecentMinutes(player.recentMinutes, minutesPlayed),
+          seasonStats: {
+            appearances: (player.seasonStats?.appearances ?? 0) + 1,
+            goals: (player.seasonStats?.goals ?? 0) + (goalsByPlayer.get(player.id) ?? 0),
+            assists: (player.seasonStats?.assists ?? 0) + (assistsByPlayer.get(player.id) ?? 0),
+          },
         }
       }),
     }

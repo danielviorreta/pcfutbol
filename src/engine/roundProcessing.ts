@@ -58,7 +58,7 @@ export function applyRoundResult(game: ManagerGameState, result: RoundProcessing
     rngSeed: result.nextRngSeed,
     seasonStartYear: result.seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
     financeEntries: result.financeEntries,
-    leagueState: result.stateAfterOutgoing,
+    leagueState: result.seasonRolledOver ? labelLatestSeason(result.stateAfterOutgoing, game.seasonStartYear) : result.stateAfterOutgoing,
     pendingTransferOffers: result.pendingTransferOffers,
     pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter(
       (offer) => !result.resolvedRenewalOffers.some((resolved) => resolved.id === offer.id),
@@ -69,6 +69,17 @@ export function applyRoundResult(game: ManagerGameState, result: RoundProcessing
     managerLineup: syncManagerLineup(result.nextManagerTeamFinal, game.managerLineup),
     managerSquadOrder: syncManagerSquadOrder(result.nextManagerTeamFinal, game.managerSquadOrder),
   }
+}
+
+/** Stamps the season just finished (e.g. "2026/27") on the newest history record. */
+function labelLatestSeason(state: LeagueState, seasonStartYear: number): LeagueState {
+  const history = state.seasonHistory ?? []
+  const latest = history[history.length - 1]
+  if (!latest || latest.label) {
+    return state
+  }
+  const label = `${seasonStartYear}/${String((seasonStartYear + 1) % 100).padStart(2, '0')}`
+  return { ...state, seasonHistory: [...history.slice(0, -1), { ...latest, label }] }
 }
 
 function runRound(

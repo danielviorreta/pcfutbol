@@ -2537,3 +2537,18 @@ input[type='checkbox'] {
     flex-direction: column;
   }
 }
+
+.history-leaders {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+
+.history-seasons {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.history-season table {
+  margin-bottom: 0.5rem;
+}

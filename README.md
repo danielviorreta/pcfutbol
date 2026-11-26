@@ -48,6 +48,7 @@ Además del guardado automático en navegador, ya incluye copia de seguridad man
   - Ligas por divisiones y grupos (Primera, Segunda y Primera Federacion).
   - Clasificacion, calendario y avance por jornadas.
   - Sistema de ascensos/descensos y vista de promociones.
+  - Estadisticas de temporada (partidos, goles, asistencias), tablas de goleadores y asistentes, e historial de temporadas (campeones, pichichis, ascensos/descensos y tu posicion).
 - Simulacion de partido y jornada:
   - Flujo de `MatchDay`: previa, simulacion y resultado final.
   - Estadisticas del partido (posesion, tiros, ocasiones, asistencia).
