@@ -1,18 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState } from 'react'
-import {
-  promoteYouthPlayer,
-  submitRenewalOffer,
-  setStadiumTicketPrice,
-  setTeamTactic,
-  setTeamTrainingFocus,
-  upgradeStadium as upgradeStadiumEngine,
-} from '../engine/club'
-import { appendFinanceEntries, createFinanceEntry, getTeamBudget } from '../engine/finance'
-import { buildGame, getCurrentManagerFixture, getManagerTeam, syncManagerLineup, syncManagerSquadOrder } from '../engine/gameUtils'
-import { performStaffUpgrade } from '../engine/staffUpgrades'
-import { validatePlayerPurchase } from '../engine/purchaseValidation'
-import { processRound } from '../engine/roundProcessing'
+import { buildGame, getCurrentManagerFixture, getManagerTeam, syncManagerLineup } from '../engine/gameUtils'
+import { applyRoundResult, processRound } from '../engine/roundProcessing'
+import * as actions from './gameActions'
+import type { ActionResult } from './gameActions'
 import {
   buildGoalRecords,
   buildLineupWarning,
@@ -25,12 +16,9 @@ import {
 import { loadSaveStorage, parseSaveStorage, saveSaveStorage, serializeSaveStorage, toGameSummaries } from '../engine/persistence'
 import { sortLeagueTable } from '../engine/simulation'
 import {
-  canToggleInLineup,
   getDefaultLineup,
-  getFormationSlots,
-  isPlayerAvailable,
 } from '../engine/squad'
-import { acceptIncomingTransferOffer, getTransferTargets, setPlayerTransferStatus } from '../engine/transfers'
+import { getTransferTargets } from '../engine/transfers'
 import type {
   GameSummary,
   IncomingTransferOffer,
@@ -62,9 +50,10 @@ interface GameContextValue {
   pendingRenewalOffers: PendingRenewalOffer[]
   savedGames: GameSummary[]
   notice: string | null
+  storageError: string | null
   setManagerName: (value: string) => void
   setSaveName: (value: string) => void
-  createGame: (input: CreateGameInput) => void
+  createGame: (input: CreateGameInput) => Promise<void>
   selectGame: (gameId: string) => void
   deleteGame: (gameId: string) => void
   exportSaves: () => string
@@ -73,7 +62,7 @@ interface GameContextValue {
   prepareMatchPresentation: () => boolean
   confirmMatchPresentation: () => void
   clearMatchPresentation: () => void
-  resetGame: () => void
+  resetGame: () => Promise<void>
   toggleLineupPlayer: (playerId: string) => void
   setLineupSlotPlayer: (slotIndex: number, playerId: string) => void
   reorderSquadPlayer: (sourcePlayerId: string, targetPlayerId: string) => void
@@ -100,10 +89,11 @@ interface GameContextValue {
 const GameContext = createContext<GameContextValue | null>(null)
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const initialStorage = loadSaveStorage()
+  const [initialStorage] = useState(loadSaveStorage)
   const [games, setGames] = useState<ManagerGameState[]>(initialStorage.games)
   const [activeGameId, setActiveGameId] = useState<string | null>(initialStorage.activeGameId)
   const [notice, setNotice] = useState<string | null>(null)
+  const [storageError, setStorageError] = useState<string | null>(null)
   const [matchPresentation, setMatchPresentation] = useState<MatchPresentation | null>(null)
 
   const game = useMemo(
@@ -135,7 +125,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const savedGames = useMemo(() => toGameSummaries(games), [games])
 
   const persistCollection = (nextGames: ManagerGameState[], nextActiveGameId: string | null) => {
-    saveSaveStorage({ games: nextGames, activeGameId: nextActiveGameId })
+    // Only games whose object changed need rewriting; unchanged ones keep the same reference.
+    const previousById = new Map(games.map((item) => [item.id, item]))
+    const changedIds = nextGames.filter((item) => previousById.get(item.id) !== item).map((item) => item.id)
+    const result = saveSaveStorage({ games: nextGames, activeGameId: nextActiveGameId }, changedIds)
+    setStorageError(result.ok ? null : result.error)
     setGames(nextGames)
     setActiveGameId(nextActiveGameId)
   }
@@ -157,8 +151,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     persistCollection(nextGames, nextGame.id)
   }
 
-  const createGame = (input: CreateGameInput) => {
-    const nextGame = buildGame(input)
+  /** Wraps a pure action: shows its notice and saves only when the game actually changed. */
+  const run = <Args extends unknown[]>(action: (current: ManagerGameState, ...args: Args) => ActionResult) =>
+    (...args: Args) => {
+      if (!game) {
+        return
+      }
+      const result = action(game, ...args)
+      if (result.notice !== undefined) {
+        setNotice(result.notice)
+      }
+      if (result.game !== game) {
+        updateActiveGame(() => result.game)
+      }
+    }
+
+  const createGame = async (input: CreateGameInput) => {
+    const nextGame = await buildGame(input)
     const nextGames = [...games, nextGame]
     persistCollection(nextGames, nextGame.id)
     setMatchPresentation(null)
@@ -222,13 +231,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return true
   }
 
-  const setManagerName = (value: string) => {
-    updateActiveGame((prev) => ({ ...prev, managerName: value || 'Mister' }))
-  }
+  const setManagerName = run(actions.setManagerName)
 
-  const setSaveName = (value: string) => {
-    updateActiveGame((prev) => ({ ...prev, saveName: value.trim() || prev.saveName }))
-  }
+  const setSaveName = run(actions.setSaveName)
 
   const playRound = () => {
     updateActiveGame((prev) => {
@@ -240,21 +245,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setNotice('Jornada completada. Partida guardada automaticamente.')
       }
 
-      return {
-        ...prev,
-        seasonStartYear: result.seasonRolledOver ? prev.seasonStartYear + 1 : prev.seasonStartYear,
-        financeEntries: result.financeEntries,
-        leagueState: result.stateAfterOutgoing,
-        pendingTransferOffers: result.pendingTransferOffers,
-        pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter(
-          (o) => !result.resolvedRenewalOffers.some(resolved => resolved.id === o.id)
-        ),
-        pendingOutgoingTransfers: prev.pendingOutgoingTransfers.filter(
-          (o) => !result.resolvedOutgoingIds.has(o.id)
-        ),
-        managerLineup: syncManagerLineup(result.nextManagerTeamFinal, prev.managerLineup),
-        managerSquadOrder: syncManagerSquadOrder(result.nextManagerTeamFinal, prev.managerSquadOrder),
-      }
+      return applyRoundResult(prev, result)
     })
   }
 
@@ -330,20 +321,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const result = processRound(game, game.managerLineup)
 
     const nextGame: ManagerGameState = {
-      ...game,
+      ...applyRoundResult(game, result),
       updatedAt: new Date().toISOString(),
-      seasonStartYear: result.seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
-      financeEntries: result.financeEntries,
-      leagueState: result.stateAfterOutgoing,
-      pendingTransferOffers: result.pendingTransferOffers,
-      pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter(
-        (o) => !result.resolvedRenewalOffers.some(resolved => resolved.id === o.id)
-      ),
-      pendingOutgoingTransfers: game.pendingOutgoingTransfers.filter(
-        (o) => !result.resolvedOutgoingIds.has(o.id)
-      ),
-      managerLineup: syncManagerLineup(result.nextManagerTeamFinal, game.managerLineup),
-      managerSquadOrder: syncManagerSquadOrder(result.nextManagerTeamFinal, game.managerSquadOrder),
     }
 
     const nextGames = games.map((candidate) =>
@@ -418,12 +397,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const resetGame = () => {
+  const resetGame = async () => {
     if (!game) {
       return
     }
 
-    const replacement = buildGame({
+    const replacement = await buildGame({
       saveName: game.saveName,
       managerName: game.managerName,
       managerTeamId: game.managerTeamId,
@@ -434,237 +413,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setNotice('Partida reiniciada conservando club y nombre de guardado.')
   }
 
-  const toggleLineupPlayer = (playerId: string) => {
-    updateActiveGame((prev) => {
-      const currentTeam = getManagerTeam(prev)
-      if (!currentTeam) {
-        return prev
-      }
+  const toggleLineupPlayer = run(actions.toggleLineupPlayer)
 
-      const lineup = prev.managerLineup
-      if (!canToggleInLineup(currentTeam, lineup, playerId)) {
-        setNotice('Jugador no disponible para el once titular.')
-        return prev
-      }
+  const autoPickLineup = run(actions.autoPickLineup)
 
-      const inLineup = lineup.includes(playerId)
-      const nextLineup = inLineup ? lineup.filter((id) => id !== playerId) : [...lineup, playerId]
+  const setLineupSlotPlayer = run(actions.setLineupSlotPlayer)
 
-      return {
-        ...prev,
-        managerLineup: syncManagerLineup(currentTeam, nextLineup),
-      }
-    })
-  }
+  const reorderSquadPlayer = run(actions.reorderSquadPlayer)
 
-  const autoPickLineup = () => {
-    updateActiveGame((prev) => {
-      const currentTeam = getManagerTeam(prev)
-      if (!currentTeam) {
-        return prev
-      }
+  const purchasePlayer = run(actions.purchasePlayer)
 
-      return {
-        ...prev,
-        managerLineup: getDefaultLineup(currentTeam),
-      }
-    })
-  }
+  const cancelOutgoingTransfer = run(actions.cancelOutgoingTransfer)
 
-  const setLineupSlotPlayer = (slotIndex: number, playerId: string) => {
-    updateActiveGame((prev) => {
-      const currentTeam = getManagerTeam(prev)
-      if (!currentTeam) {
-        return prev
-      }
+  const listPlayerForTransfer = run(actions.listPlayerForTransfer)
 
-      const player = currentTeam.players.find((candidate) => candidate.id === playerId)
-      if (!player || !isPlayerAvailable(player)) {
-        setNotice('Jugador no disponible para este rol.')
-        return prev
-      }
+  const removePlayerFromTransferList = run(actions.removePlayerFromTransferList)
 
-      const slots = getFormationSlots(currentTeam)
-      if (slotIndex < 0 || slotIndex >= slots.length) {
-        return prev
-      }
+  const acceptTransferOffer = run(actions.acceptTransferOffer)
 
-      const normalized = syncManagerLineup(currentTeam, prev.managerLineup)
-      const nextLineup = [...normalized]
-      const existingIndex = nextLineup.findIndex((id, idx) => id === playerId && idx !== slotIndex)
-      const previousAtSlot = nextLineup[slotIndex]
-
-      nextLineup[slotIndex] = playerId
-      if (existingIndex >= 0) {
-        nextLineup[existingIndex] = previousAtSlot
-      }
-
-      return {
-        ...prev,
-        managerLineup: syncManagerLineup(currentTeam, nextLineup),
-        managerSquadOrder: syncManagerSquadOrder(currentTeam, prev.managerSquadOrder),
-      }
-    })
-  }
-
-  const reorderSquadPlayer = (sourcePlayerId: string, targetPlayerId: string) => {
-    updateActiveGame((prev) => {
-      const currentTeam = getManagerTeam(prev)
-      if (!currentTeam || sourcePlayerId === targetPlayerId) {
-        return prev
-      }
-
-      const nextOrder = syncManagerSquadOrder(currentTeam, prev.managerSquadOrder)
-      const sourceIndex = nextOrder.indexOf(sourcePlayerId)
-      const targetIndex = nextOrder.indexOf(targetPlayerId)
-
-      if (sourceIndex < 0 || targetIndex < 0) {
-        return prev
-      }
-
-      const reordered = [...nextOrder]
-      const [sourcePlayer] = reordered.splice(sourceIndex, 1)
-      reordered.splice(targetIndex, 0, sourcePlayer)
-
-      return {
-        ...prev,
-        managerSquadOrder: reordered,
-      }
-    })
-  }
-
-  const purchasePlayer = (
-    playerId: string,
-    wageOffer: number,
-    signingBonus: number,
-    contractYears: number,
-    promisedRole: PromisedRole,
-    feeOffer?: number,
-  ) => {
-    updateActiveGame((prev) => {
-      const validation = validatePlayerPurchase(
-        playerId,
-        wageOffer,
-        signingBonus,
-        contractYears,
-        promisedRole,
-        feeOffer,
-        prev.leagueState,
-        prev.managerTeamId,
-        prev.pendingOutgoingTransfers,
-      )
-
-      if (!validation.valid) {
-        setNotice(validation.error ?? 'No se pudo procesar la oferta.')
-        return prev
-      }
-
-      const offer = validation.offer!
-      setNotice(`Oferta enviada por ${offer.playerName}. El club responderá en la próxima jornada.`)
-      return {
-        ...prev,
-        pendingOutgoingTransfers: [...prev.pendingOutgoingTransfers, offer],
-      }
-    })
-  }
-
-  const cancelOutgoingTransfer = (offerId: string) => {
-    updateActiveGame((prev) => ({
-      ...prev,
-      pendingOutgoingTransfers: prev.pendingOutgoingTransfers.filter((o) => o.id !== offerId),
-    }))
-    setNotice('Oferta retirada.')
-  }
-
-  const listPlayerForTransfer = (playerId: string, askingPrice: number) => {
-    updateActiveGame((prev) => {
-      const { nextState, message, ok } = setPlayerTransferStatus(
-        prev.leagueState,
-        prev.managerTeamId,
-        playerId,
-        true,
-        askingPrice,
-      )
-      setNotice(message)
-
-      if (!ok) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        leagueState: nextState,
-      }
-    })
-  }
-
-  const removePlayerFromTransferList = (playerId: string) => {
-    updateActiveGame((prev) => {
-      const { nextState, message, ok } = setPlayerTransferStatus(
-        prev.leagueState,
-        prev.managerTeamId,
-        playerId,
-        false,
-      )
-      setNotice(message)
-
-      if (!ok) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        leagueState: nextState,
-      }
-    })
-  }
-
-  const acceptTransferOffer = (offerId: string) => {
-    updateActiveGame((prev) => {
-      const offer = prev.pendingTransferOffers.find((item) => item.id === offerId)
-      if (!offer) {
-        setNotice('La oferta ya no esta disponible.')
-        return prev
-      }
-
-      if (offer.createdRound >= prev.leagueState.currentRound) {
-        setNotice('Debes esperar a la siguiente jornada para responder a esta oferta.')
-        return prev
-      }
-
-      const { nextState, message, ok } = acceptIncomingTransferOffer(prev.leagueState, offer)
-      setNotice(message)
-
-      if (!ok) {
-        return {
-          ...prev,
-          pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
-        }
-      }
-
-      const nextManagerTeam = nextState.teams.find((team) => team.id === prev.managerTeamId) ?? nextState.teams[0]
-      const income = getTeamBudget(nextState.teams, prev.managerTeamId) - getTeamBudget(prev.leagueState.teams, prev.managerTeamId)
-
-      return {
-        ...prev,
-        financeEntries: appendFinanceEntries(prev, [
-          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'transfer-out', income, `Venta de ${offer.playerName}`),
-        ]),
-        leagueState: nextState,
-        pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
-        managerLineup: syncManagerLineup(nextManagerTeam, prev.managerLineup),
-        managerSquadOrder: syncManagerSquadOrder(nextManagerTeam, prev.managerSquadOrder),
-      }
-    })
-  }
-
-  const rejectTransferOffer = (offerId: string) => {
-    updateActiveGame((prev) => ({
-      ...prev,
-      pendingTransferOffers: prev.pendingTransferOffers.filter((item) => item.id !== offerId),
-    }))
-    setNotice('Oferta rechazada.')
-  }
+  const rejectTransferOffer = run(actions.rejectTransferOffer)
 
   const saveCurrentGame = () => {
     if (!game) {
@@ -678,158 +445,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setNotice('Partida guardada.')
   }
 
-  const setTrainingFocus = (focus: TrainingFocus) => {
-    updateActiveGame((prev) => ({
-      ...prev,
-      leagueState: setTeamTrainingFocus(prev.leagueState, prev.managerTeamId, focus),
-    }))
-    setNotice(`Plan de entrenamiento actualizado: ${focus}.`)
-  }
+  const setTrainingFocus = run(actions.setTrainingFocus)
 
-  const setTactic = (tactic: Tactic) => {
-    updateActiveGame((prev) => {
-      const nextLeagueState = setTeamTactic(prev.leagueState, prev.managerTeamId, tactic)
-      const nextManagerTeam =
-        nextLeagueState.teams.find((team) => team.id === prev.managerTeamId) ??
-        nextLeagueState.teams[0]
+  const setTactic = run(actions.setTactic)
 
-      return {
-        ...prev,
-        leagueState: nextLeagueState,
-        managerLineup: syncManagerLineup(nextManagerTeam, prev.managerLineup),
-        managerSquadOrder: syncManagerSquadOrder(nextManagerTeam, prev.managerSquadOrder),
-      }
-    })
-    setNotice(`Tactica actualizada: ${tactic}.`)
-  }
+  const renewContract = run(actions.renewContract)
 
-  const renewContract = (playerId: string, wageOffer?: number, contractYears?: number) => {
-    updateActiveGame((prev) => {
-      if ((prev.pendingRenewalOffers ?? []).some((offer) => offer.playerId === playerId)) {
-        setNotice('Ya hay una oferta de renovación pendiente para este jugador.')
-        return prev
-      }
+  const cancelRenewalOffer = run(actions.cancelRenewalOffer)
 
-      const { offer, ok, message } = submitRenewalOffer(
-        prev.leagueState,
-        prev.managerTeamId,
-        playerId,
-        wageOffer ?? 0,
-        contractYears ?? 0,
-      )
-      setNotice(message)
-      if (!ok || !offer) {
-        return prev
-      }
+  const promoteYouth = run(actions.promoteYouth)
 
-      return {
-        ...prev,
-        pendingRenewalOffers: [...(prev.pendingRenewalOffers ?? []), offer],
-      }
-    })
-  }
+  const setTicketPrice = run(actions.setTicketPrice)
 
-  const cancelRenewalOffer = (offerId: string) => {
-    updateActiveGame((prev) => ({
-      ...prev,
-      pendingRenewalOffers: (prev.pendingRenewalOffers ?? []).filter((o) => o.id !== offerId),
-    }))
-    setNotice('Oferta de renovación retirada.')
-  }
+  const upgradeStadium = run(actions.upgradeStadium)
 
-  const promoteYouth = (youthId: string) => {
-    updateActiveGame((prev) => {
-      const { nextState, ok, message } = promoteYouthPlayer(prev.leagueState, prev.managerTeamId, youthId)
-      setNotice(message)
-      if (!ok) {
-        return prev
-      }
+  const improveMedicalStaff = run(actions.improveMedicalStaff)
 
-      const managerTeamAfter = nextState.teams.find((team) => team.id === prev.managerTeamId) ?? nextState.teams[0]
-
-      return {
-        ...prev,
-        leagueState: nextState,
-        managerLineup: syncManagerLineup(managerTeamAfter, prev.managerLineup),
-        managerSquadOrder: syncManagerSquadOrder(managerTeamAfter, prev.managerSquadOrder),
-      }
-    })
-  }
-
-  const setTicketPrice = (price: number) => {
-    updateActiveGame((prev) => ({
-      ...prev,
-      leagueState: setStadiumTicketPrice(prev.leagueState, prev.managerTeamId, price),
-    }))
-  }
-
-  const upgradeStadium = () => {
-    updateActiveGame((prev) => {
-      const { nextState, message, ok } = upgradeStadiumEngine(prev.leagueState, prev.managerTeamId)
-      setNotice(message)
-
-      if (!ok) {
-        return prev
-      }
-
-      const cost = getTeamBudget(prev.leagueState.teams, prev.managerTeamId) - getTeamBudget(nextState.teams, prev.managerTeamId)
-      return {
-        ...prev,
-        financeEntries: appendFinanceEntries(prev, [
-          createFinanceEntry(prev.leagueState.currentRound, prev.managerTeamId, 'infrastructure', -cost, 'Ampliación de estadio'),
-        ]),
-        leagueState: nextState,
-      }
-    })
-  }
-
-  const improveMedicalStaff = () => {
-    updateActiveGame((prev) => {
-      const result = performStaffUpgrade(prev, 'medical')
-      setNotice(result.message)
-      if (!result.success || !result.nextLeagueState) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        leagueState: result.nextLeagueState,
-        financeEntries: appendFinanceEntries(prev, [
-          createFinanceEntry(
-            prev.leagueState.currentRound,
-            prev.managerTeamId,
-            'staff',
-            -(result.cost ?? 0),
-            'Mejora de cuerpo médico',
-          ),
-        ]),
-      }
-    })
-  }
-
-  const improveDisciplineStaff = () => {
-    updateActiveGame((prev) => {
-      const result = performStaffUpgrade(prev, 'discipline')
-      setNotice(result.message)
-      if (!result.success || !result.nextLeagueState) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        leagueState: result.nextLeagueState,
-        financeEntries: appendFinanceEntries(prev, [
-          createFinanceEntry(
-            prev.leagueState.currentRound,
-            prev.managerTeamId,
-            'staff',
-            -(result.cost ?? 0),
-            'Mejora de disciplina',
-          ),
-        ]),
-      }
-    })
-  }
+  const improveDisciplineStaff = run(actions.improveDisciplineStaff)
 
   const clearNotice = () => setNotice(null)
   const clearMatchPresentation = () => setMatchPresentation(null)
@@ -845,6 +477,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     pendingOutgoingTransfers: game?.pendingOutgoingTransfers ?? [],
     savedGames,
     notice,
+    storageError,
     setManagerName,
     setSaveName,
     createGame,

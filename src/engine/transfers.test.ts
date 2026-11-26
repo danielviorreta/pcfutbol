@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { buyPlayer, getTransferTargets, simulateAiTransferWindow } from './transfers'
+import { setRandomSource } from './random'
 import { estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import type { LeagueState, Player, Team } from '../types/game'
 
@@ -240,10 +241,10 @@ describe('transfers engine', () => {
     const state = makeState([manager, buyer, seller])
     state.currentRound = 2
 
-    const random = vi.spyOn(Math, 'random').mockReturnValue(0.3)
+    setRandomSource(() => 0.3)
 
     const result = simulateAiTransferWindow(state, 'mgr')
-    random.mockRestore()
+    setRandomSource(null)
 
     const nextBuyer = result.nextState.teams.find((team) => team.id === 'buy')!
     const nextSeller = result.nextState.teams.find((team) => team.id === 'sell')!
@@ -270,9 +271,9 @@ describe('transfers engine', () => {
     const state = makeState([manager, aiTeam])
     state.currentRound = 6
 
-    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    setRandomSource(() => 0)
     const result = simulateAiTransferWindow(state, 'mgr')
-    random.mockRestore()
+    setRandomSource(null)
 
     const nextAiTeam = result.nextState.teams.find((team) => team.id === 'ai')
     const listedCount = nextAiTeam?.players.filter((player) => player.transferListed).length ?? 0

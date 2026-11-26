@@ -1,25 +1,31 @@
 # PCFutbol Legacy
 
-Juego de gestion futbolistica inspirado en la etapa clasica de PC Futbol, construido como SPA con React + TypeScript.
+Juego de gestión futbolística inspirado en la etapa clásica de PC Fútbol, construido como SPA con React + TypeScript.
+
+**Jugar:** https://danielviorreta.github.io/pcfutbol/
+
+**Temporada:** 2026-27 — Primera (20), Segunda (22) y Primera Federación (2 grupos de 20), con plantillas reales.
 
 ## Cómo funciona
 
 **Flujo principal:**
-1. **Crear partida** — Elige club (cualquier divisón), nombre de manager y guardado
+1. **Crear partida** — Elige club (cualquier división), nombre de manager y guardado
 2. **Pantalla principal** — Accede a: Plantilla, Calendario, Finanzas, Mercado, Club o Jornada
-3. **Jugar jornada** — Simula ronda: procesa todos los partidos, gestiona club (entrenamientos, renovaciones, renovales), resuelve ofertas y traspasos
+3. **Jugar jornada** — Simula ronda: procesa todos los partidos, gestiona club (entrenamientos, renovaciones, cantera), resuelve ofertas y traspasos
 4. **Ver resultado** — Detalle completo del partido: alineaciones, goleadores, incidencias, tácticas
 5. **Repetir** — Avanza de ronda hasta ascenso/descenso, cambio de división o fin de temporada
 
 **Arquitectura:**
 - **Estado global** — Contexto React (`GameProvider`) gestiona: partida activa, liga simulada, plantilla del manager, ofertas pendientes, historial de finanzas
+- **Acciones** (`src/state/gameActions.ts`) — Funciones puras `(partida, ...args) → { partida, aviso }`; el provider solo muestra el aviso y guarda si algo cambió
 - **Motor de juego** (`src/engine/`) — Módulos puros para simulación, plantilla, fichajes, persistencia (0 React)
-- **Páginas** (`src/pages/`) — UI specific per sección del juego
-- **Persistencia** — Guardado automático en `localStorage` + export/import JSON para backups
+- **Páginas** (`src/pages/`) — UI específica de cada sección del juego
+- **Persistencia** — Guardado automático en `localStorage` (una clave por partida) + export/import JSON para backups
+- **Aleatoriedad con semilla** — Toda la simulación usa `engine/random.ts`; cada partida guarda su semilla, así que una jornada es reproducible
 
 **Ciclo de persistencia:**
 ```
-GameProvider (estado React) ←→ localStorage (sincronización automática)
+GameProvider (estado React) ←→ localStorage (índice + una clave por partida)
                             ↓
                      JSON export/import (backups manuales)
 ```
@@ -28,7 +34,7 @@ GameProvider (estado React) ←→ localStorage (sincronización automática)
 
 El proyecto es jugable end-to-end en modo carrera y cubre el bucle completo de una temporada: crear partida, gestionar club/plantilla, disputar jornadas, mover mercado, controlar finanzas y cerrar ciclo con ascensos/descensos.
 
-Ademas del guardado automatico en navegador, ya incluye copia de seguridad manual mediante exportacion/importacion de partidas en JSON.
+Además del guardado automático en navegador, ya incluye copia de seguridad manual mediante exportacion/importacion de partidas en JSON.
 
 ## Funcionalidades implementadas
 
@@ -95,16 +101,19 @@ UI click "Jugar jornada"
       → resolveRenewalOffers() [resuelve renovaciones]
       → buyPlayer() x N [resuelve transferencias salientes]
     ← RoundProcessingResult {nextLeagueState, financeEntries, ...}
-  → updateActiveGame(prev → {...prev, leagueState, financeEntries, ...})
-    → persistCollection(nextGames) [localStorage + React state]
+  → applyRoundResult(game, result) [nueva partida + semilla]
+  → updateActiveGame(...)
+    → persistCollection(nextGames) [guarda solo las partidas que cambiaron]
 ```
 
 **Módulos principales:**
 - `engine/simulation.ts` — Simulador de partidos (stats, goles, incidencias)
 - `engine/squad.ts` — Validación y gestión de alineaciones
 - `engine/transfers.ts` — Lógica de compra/venta de jugadores
-- `engine/club.ts` — Upgrade de staff, tactica, entrenamiento
-- `engine/roundProcessing.ts` — Orquestación completa de ronda (extrae duplicación)
+- `engine/club/` — Gestión semanal, entrenamiento, ascensos/descensos y playoffs, staff/estadio, renovaciones y cantera
+- `engine/roundProcessing.ts` — Orquestación completa de ronda
+- `engine/random.ts` — Generador aleatorio con semilla
+- `engine/fixtures.ts` — Calendario (liga a doble vuelta)
 - `engine/purchaseValidation.ts` — Validaciones de compra (modular e independiente)
 
 
@@ -138,7 +147,7 @@ npm run preview   # preview del build
 
 ## Calidad y CI
 
-- Tests unitarios en modulos de motor (`simulation`, `squad`, `transfers`).
+- Tests unitarios del motor (`simulation`, `squad`, `transfers`, `finance`, `persistence`, `random`, ascensos/descensos), de las acciones y una temporada completa simulada.
 - Workflow de PR con comprobaciones de lint, test y build.
 - Workflow de despliegue a GitHub Pages.
 
@@ -153,12 +162,14 @@ npm run preview   # preview del build
 ```
 src/
   components/           # UI reutilizable (tabla, noticias, resultados, escudos)
-  data/                # datos semilla y bootstrap de ligas/equipos
+  data/                # season-2026-27.json (equipos y plantillas) + seedData.ts (genera la liga)
   engine/              # lógica pura del juego (0 React)
     ├── simulation.ts   # simulador de partidos, stats, goles, incidencias
     ├── squad.ts        # validación de alineaciones y posiciones
     ├── transfers.ts    # compra/venta de jugadores
-    ├── club.ts         # upgrade de staff, tácticas, entrenamientos
+    ├── club/           # gestión semanal, entrenamiento, ascensos, staff, renovaciones, cantera
+    ├── random.ts       # aleatoriedad con semilla
+    ├── fixtures.ts     # generación del calendario
     ├── matchPresentation.ts     # construcción de narrativa del partido
     ├── roundProcessing.ts       # orquestación de ronda completa
     ├── purchaseValidation.ts    # validadores de compra
@@ -166,11 +177,15 @@ src/
     ├── finance.ts      # gestión de presupuesto y libro financiero
     └── persistence.ts  # localStorage e import/export JSON
   pages/               # vistas del juego (Games, Dashboard, Matches, Squad, etc.)
-  state/               # GameContext y GameProvider (orquestación del estado)
+  state/               # GameProvider + gameActions (acciones puras)
   types/               # tipos compartidos (Team, Player, LeagueState, etc)
 ```
 
-## Proximos pasos sugeridos
+## Actualizar la temporada
+
+Los equipos y plantillas viven en `src/data/season-2026-27.json` (un equipo por línea). Cada equipo tiene 22 jugadores en este orden de huecos: once titular (POR, 4 DEF, 3 MED, 3 DEL) y banquillo (POR, 4 DEF, 4 MED, 2 DEL). Edad y media (`overall`) son estimaciones. Para una nueva temporada basta con sustituir el JSON y cambiar la importación en `seedData.ts`; las partidas guardadas conservan sus datos.
+
+## Próximos pasos sugeridos
 
 1. Balance economico mas profundo (sueldos, renovaciones, primas).
 2. Evolucion de jugadores y cantera.

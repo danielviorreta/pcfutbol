@@ -63,8 +63,8 @@ export function CalendarPage() {
   const [selectedCompetition, setSelectedCompetition] = useState<CalendarCompetition>(initialCompetition)
   const [selectedRound, setSelectedRound] = useState<number | null>(null)
 
-  const allTeams = game?.leagueState.teams ?? []
-  const allFixtures = game?.leagueState.fixtures ?? []
+  const allTeams = useMemo(() => game?.leagueState.teams ?? [], [game])
+  const allFixtures = useMemo(() => game?.leagueState.fixtures ?? [], [game])
 
   const availableRounds = Array.from(
     new Set(

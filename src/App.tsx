@@ -20,7 +20,7 @@ function formatSeasonLabel(startYear: number): string {
 }
 
 function App() {
-  const { game, setManagerName, setSaveName, clearNotice, notice, managerTeam } = useGame()
+  const { game, setManagerName, setSaveName, clearNotice, notice, storageError, managerTeam } = useGame()
   const hasActivePromotions = Boolean(
     game && (game.leagueState.promotionSummary.length > 0 || game.leagueState.promotionBracket),
   )
@@ -79,6 +79,12 @@ function App() {
         {hasActivePromotions && <NavLink to="/promotions">Ascensos</NavLink>}
         {game && <NavLink to="/transfers">Mercado</NavLink>}
       </nav>
+
+      {storageError && (
+        <div className="notice notice-error" role="alert">
+          <span>{storageError}</span>
+        </div>
+      )}
 
       {notice && (
         <div className="notice" role="status">

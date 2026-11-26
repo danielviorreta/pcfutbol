@@ -1,6 +1,5 @@
 import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import type { GameSummary, ManagerGameState } from '../types/game'
-import { PLAYER_REAL_AGES } from '../data/playerRealData'
 
 export interface SaveStorage {
   games: ManagerGameState[]
@@ -13,7 +12,12 @@ interface SaveExport {
   storage: SaveStorage
 }
 
+// v2 layout: one index key plus one key per game, so saving writes only what changed.
+const INDEX_KEY = 'pcfutbol-saves-index'
+const GAME_KEY_PREFIX = 'pcfutbol-save:'
+// v1 layout: every game in a single key.
 const STORAGE_KEY = 'pcfutbol-legacy-saves'
+// v0 layout: a single game.
 const LEGACY_STORAGE_KEY = 'pcfutbol-legacy-save'
 const DEFAULT_SEASON_START_YEAR = 2025
 
@@ -34,11 +38,6 @@ function estimateMissingPlayerAge(
   player: { id: string; name?: string; position: string; overall: number; contractYears?: number },
   division?: string,
 ): number {
-  const byName = player.name ? PLAYER_REAL_AGES[player.name] : undefined
-  if (typeof byName === 'number') {
-    return clamp(Math.round(byName), 16, 40)
-  }
-
   const seed = hashText(player.id)
   const positionBase =
     player.position === 'GK'
@@ -142,8 +141,86 @@ function normalizeManagerSquadOrder(game: ManagerGameState): string[] {
   return [...normalized, ...missing]
 }
 
-function persistStorage(storage: SaveStorage): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(storage))
+export type SaveResult = { ok: true } | { ok: false; error: string }
+
+interface SaveIndex {
+  version: 2
+  gameIds: string[]
+  activeGameId: string | null
+}
+
+function gameKey(gameId: string): string {
+  return `${GAME_KEY_PREFIX}${gameId}`
+}
+
+function describeStorageError(error: unknown): string {
+  const isQuota =
+    error instanceof DOMException &&
+    (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+  return isQuota
+    ? 'No se pudo guardar: el almacenamiento del navegador esta lleno. Exporta una copia y elimina partidas antiguas.'
+    : 'No se pudo guardar la partida en el navegador.'
+}
+
+function readIndex(): SaveIndex | null {
+  const raw = localStorage.getItem(INDEX_KEY)
+  if (!raw) {
+    return null
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<SaveIndex>
+    return {
+      version: 2,
+      gameIds: Array.isArray(parsed.gameIds) ? parsed.gameIds.filter((id): id is string => typeof id === 'string') : [],
+      activeGameId: typeof parsed.activeGameId === 'string' ? parsed.activeGameId : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Writes the save index plus only the games listed in `changedGameIds`
+ * (all games when omitted), and removes keys of games no longer present.
+ * Never throws: storage failures (e.g. quota exceeded) are returned as errors.
+ */
+function persistStorage(storage: SaveStorage, changedGameIds?: Iterable<string>): SaveResult {
+  try {
+    const toWrite = changedGameIds ? new Set(changedGameIds) : null
+    storage.games.forEach((game) => {
+      if (!toWrite || toWrite.has(game.id)) {
+        localStorage.setItem(gameKey(game.id), JSON.stringify(game))
+      }
+    })
+
+    const nextIds = new Set(storage.games.map((game) => game.id))
+    readIndex()?.gameIds.forEach((id) => {
+      if (!nextIds.has(id)) {
+        localStorage.removeItem(gameKey(id))
+      }
+    })
+
+    const index: SaveIndex = { version: 2, gameIds: [...nextIds], activeGameId: storage.activeGameId }
+    localStorage.setItem(INDEX_KEY, JSON.stringify(index))
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: describeStorageError(error) }
+  }
+}
+
+function loadIndexedStorage(index: SaveIndex): SaveStorage {
+  const games = index.gameIds.flatMap((id) => {
+    const raw = localStorage.getItem(gameKey(id))
+    if (!raw) {
+      return []
+    }
+    try {
+      return [JSON.parse(raw) as ManagerGameState]
+    } catch {
+      return []
+    }
+  })
+  return normalizeStorage({ games, activeGameId: index.activeGameId })
 }
 
 function normalizeStorage(parsed: Partial<SaveStorage>): SaveStorage {
@@ -266,48 +343,46 @@ function normalizeGame(game: ManagerGameState): ManagerGameState {
 }
 
 export function loadSaveStorage(): SaveStorage {
-  const raw = localStorage.getItem(STORAGE_KEY)
-
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as Partial<SaveStorage>
-      return normalizeStorage(parsed)
-    } catch {
-      return { games: [], activeGameId: null }
-    }
-  }
-
-  const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
-  if (!legacyRaw) {
-    return { games: [], activeGameId: null }
-  }
+  const empty: SaveStorage = { games: [], activeGameId: null }
 
   try {
-    const parsedLegacy = JSON.parse(legacyRaw) as Partial<ManagerGameState>
-    const migrated = makeMigratedLegacyGame(parsedLegacy)
+    const index = readIndex()
+    if (index) {
+      return loadIndexedStorage(index)
+    }
 
+    // Migrate v1 (all games in one key) to the per-game layout.
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const storage = normalizeStorage(JSON.parse(raw) as Partial<SaveStorage>)
+      if (persistStorage(storage).ok) {
+        localStorage.removeItem(STORAGE_KEY)
+      }
+      return storage
+    }
+
+    // Migrate v0 (single game).
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (!legacyRaw) {
+      return empty
+    }
+    const migrated = makeMigratedLegacyGame(JSON.parse(legacyRaw) as Partial<ManagerGameState>)
     if (!migrated) {
-      return { games: [], activeGameId: null }
+      return empty
     }
-
     const normalized = normalizeGame(migrated)
-
-    const storage = {
-      games: [normalized],
-      activeGameId: normalized.id,
+    const storage = { games: [normalized], activeGameId: normalized.id }
+    if (persistStorage(storage).ok) {
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
     }
-
-    persistStorage(storage)
-    localStorage.removeItem(LEGACY_STORAGE_KEY)
-
     return storage
   } catch {
-    return { games: [], activeGameId: null }
+    return empty
   }
 }
 
-export function saveSaveStorage(storage: SaveStorage): void {
-  persistStorage(storage)
+export function saveSaveStorage(storage: SaveStorage, changedGameIds?: Iterable<string>): SaveResult {
+  return persistStorage(storage, changedGameIds)
 }
 
 export function serializeSaveStorage(storage: SaveStorage): string {

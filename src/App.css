@@ -388,6 +388,12 @@ h2 {
   font-size: 0.9rem;
 }
 
+.notice-error {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
 .page-grid {
   display: grid;
   gap: 1rem;

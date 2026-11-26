@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { playCurrentRound } from './simulation'
+import { setRandomSource } from './random'
 import type { Fixture, LeagueState, Player, Team } from '../types/game'
 
 function makePlayer(id: string, position: Player['position'], overall: number): Player {
@@ -116,6 +117,7 @@ function makeState(homeTeam: Team, awayTeam: Team): { state: LeagueState; fixtur
 
 afterEach(() => {
   vi.restoreAllMocks()
+  setRandomSource(null)
 })
 
 describe('simulation engine', () => {
@@ -130,14 +132,13 @@ describe('simulation engine', () => {
 
     const managerLineup = weakBenchHome.players.slice(0, 11).map((player) => player.id)
 
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    setRandomSource(() => 0.5)
     const weakResult = playCurrentRound(weakSetup.state, {
       managerTeamId: 'home',
       managerLineup,
     })
 
-    vi.restoreAllMocks()
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    setRandomSource(() => 0.5)
     const strongResult = playCurrentRound(strongSetup.state, {
       managerTeamId: 'home',
       managerLineup,
@@ -155,7 +156,7 @@ describe('simulation engine', () => {
     const away = makeTeam('away', 'Away FC', 72, 68)
     const { state, fixture } = makeState(home, away)
 
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    setRandomSource(() => 0.5)
 
     const nextState = playCurrentRound(state, {
       managerTeamId: 'home',

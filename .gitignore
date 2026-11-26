@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Stray git internals (never commit)
+/HEAD
+/config
+/description
+/index
+/packed-refs
+/hooks/
+/info/
+/objects/
+/refs/
