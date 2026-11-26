@@ -1,10 +1,9 @@
-import { createInitialLeagueState } from '../data/seedData'
+import { createSeed } from './random'
+import { loadSeason } from './seasonLoader'
 import { getDefaultLineup, sanitizeLineupSelection } from './squad'
 import type { Fixture, IncomingTransferOffer, ManagerGameState, Team } from '../types/game'
 
-const DEFAULT_SEASON_START_YEAR = 2026
-
-interface CreateGameInput {
+export interface CreateGameInput {
   saveName: string
   managerName: string
   managerTeamId: string
@@ -18,7 +17,8 @@ export function getManagerTeam(game: ManagerGameState | null): Team | null {
   return game.leagueState.teams.find((team) => team.id === game.managerTeamId) ?? game.leagueState.teams[0] ?? null
 }
 
-export function buildGame(input: CreateGameInput): ManagerGameState {
+export async function buildGame(input: CreateGameInput): Promise<ManagerGameState> {
+  const { createInitialLeagueState, SEASON_START_YEAR } = await loadSeason()
   const leagueState = createInitialLeagueState()
   const managerTeam =
     leagueState.teams.find((team) => team.id === input.managerTeamId) ?? leagueState.teams[0]
@@ -29,7 +29,8 @@ export function buildGame(input: CreateGameInput): ManagerGameState {
     saveName: input.saveName.trim() || `${input.managerName.trim() || 'Mister'} - ${managerTeam.name}`,
     createdAt: now,
     updatedAt: now,
-    seasonStartYear: DEFAULT_SEASON_START_YEAR,
+    seasonStartYear: SEASON_START_YEAR,
+    rngSeed: createSeed(),
     managerName: input.managerName.trim() || 'Mister',
     managerTeamId: managerTeam.id,
     managerLineup: getDefaultLineup(managerTeam),

@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createInitialLeagueState } from '../data/seedData'
+import type { SeasonClubSummary } from '../data/seedData'
+import { loadSeason } from '../engine/seasonLoader'
 import { useGame } from '../state/gameState'
 import { ClubBadge } from '../components/ClubBadge'
 
@@ -14,17 +15,35 @@ function formatDate(value: string): string {
 export function GamesPage() {
   const { game, savedGames, createGame, selectGame, deleteGame, exportSaves, importSaves } = useGame()
   const navigate = useNavigate()
-  const clubs = useMemo(() => createInitialLeagueState().teams, [])
+  const [clubs, setClubs] = useState<SeasonClubSummary[]>([])
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   const [saveName, setSaveName] = useState('Carrera 1')
   const [managerName, setManagerName] = useState('Mister')
-  const [managerTeamId, setManagerTeamId] = useState(clubs[0]?.id ?? '')
+  const [managerTeamId, setManagerTeamId] = useState('')
   const selectedClub = clubs.find((club) => club.id === managerTeamId) ?? null
 
-  const submitGame = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    let cancelled = false
+    void loadSeason().then(({ listSeasonClubs }) => {
+      if (cancelled) {
+        return
+      }
+      const list = listSeasonClubs()
+      setClubs(list)
+      setManagerTeamId((current) => current || list[0]?.id || '')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const submitGame = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    createGame({ saveName, managerName, managerTeamId })
+    if (!managerTeamId) {
+      return
+    }
+    await createGame({ saveName, managerName, managerTeamId })
     navigate('/dashboard')
   }
 

@@ -313,6 +313,8 @@ export interface ManagerGameState {
   pendingTransferOffers: IncomingTransferOffer[]
   pendingOutgoingTransfers: PendingOutgoingTransferOffer[]
   pendingRenewalOffers: PendingRenewalOffer[]
+  /** State of the seeded random generator; missing on saves created before it existed. */
+  rngSeed?: number
   leagueState: LeagueState
 }
 

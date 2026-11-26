@@ -9,7 +9,10 @@ import {
 } from './finance'
 import {
   mergeIncomingOffers,
+  syncManagerLineup,
+  syncManagerSquadOrder,
 } from './gameUtils'
+import { createSeed, withSeed } from './random'
 import { playCurrentRound } from './simulation'
 import { buyPlayer } from './transfers'
 import type {
@@ -32,6 +35,8 @@ export interface RoundProcessingResult {
   resolvedOutgoingIds: Set<string>
   nextManagerTeamFinal: Team
   initialSimulatedState: LeagueState
+  /** Seed to store on the game so the next round continues the same random sequence. */
+  nextRngSeed: number
 }
 
 /**
@@ -42,6 +47,34 @@ export function processRound(
   game: ManagerGameState,
   managerLineup: string[],
 ): RoundProcessingResult {
+  const { value, nextSeed } = withSeed(game.rngSeed ?? createSeed(), () => runRound(game, managerLineup))
+  return { ...value, nextRngSeed: nextSeed }
+}
+
+/** Builds the next game state from a processed round (shared by quick play and the match-day screen). */
+export function applyRoundResult(game: ManagerGameState, result: RoundProcessingResult): ManagerGameState {
+  return {
+    ...game,
+    rngSeed: result.nextRngSeed,
+    seasonStartYear: result.seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
+    financeEntries: result.financeEntries,
+    leagueState: result.stateAfterOutgoing,
+    pendingTransferOffers: result.pendingTransferOffers,
+    pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter(
+      (offer) => !result.resolvedRenewalOffers.some((resolved) => resolved.id === offer.id),
+    ),
+    pendingOutgoingTransfers: game.pendingOutgoingTransfers.filter(
+      (offer) => !result.resolvedOutgoingIds.has(offer.id),
+    ),
+    managerLineup: syncManagerLineup(result.nextManagerTeamFinal, game.managerLineup),
+    managerSquadOrder: syncManagerSquadOrder(result.nextManagerTeamFinal, game.managerSquadOrder),
+  }
+}
+
+function runRound(
+  game: ManagerGameState,
+  managerLineup: string[],
+): Omit<RoundProcessingResult, 'nextRngSeed'> {
   const simulatedState = playCurrentRound(game.leagueState, {
     managerTeamId: game.managerTeamId,
     managerLineup,

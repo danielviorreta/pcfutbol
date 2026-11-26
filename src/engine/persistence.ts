@@ -1,6 +1,5 @@
 import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from './playerMarket'
 import type { GameSummary, ManagerGameState } from '../types/game'
-import { PLAYER_REAL_AGES } from '../data/playerRealData'
 
 export interface SaveStorage {
   games: ManagerGameState[]
@@ -39,11 +38,6 @@ function estimateMissingPlayerAge(
   player: { id: string; name?: string; position: string; overall: number; contractYears?: number },
   division?: string,
 ): number {
-  const byName = player.name ? PLAYER_REAL_AGES[player.name] : undefined
-  if (typeof byName === 'number') {
-    return clamp(Math.round(byName), 16, 40)
-  }
-
   const seed = hashText(player.id)
   const positionBase =
     player.position === 'GK'

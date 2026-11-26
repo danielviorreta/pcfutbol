@@ -1,3 +1,4 @@
+import { random } from './random'
 import type { FinanceBreakdownItem, Fixture, LeagueState, MatchResult, Player, Team } from '../types/game'
 import { getOperationalCapacity } from './stadium'
 import { getDefaultLineup, getTeamRatings, isPlayerAvailable, normalizeLineup } from './squad'
@@ -64,17 +65,17 @@ function getInjuryChance(team: Team, stamina: number, fatigue: number): number {
 
 function getInjuryDuration(fatigue: number): number {
   if (fatigue >= 88) {
-    return 2 + Math.floor(Math.random() * 4)
+    return 2 + Math.floor(random() * 4)
   }
 
-  return 1 + Math.floor(Math.random() * 3)
+  return 1 + Math.floor(random() * 3)
 }
 
 function sampleHalfGoals(offenseScore: number, defenseScore: number, tempo = 1): number {
   const edge = offenseScore - defenseScore
   // Softer edge scaling avoids over-penalizing attacks against slightly stronger defenses.
   const base = 0.68 + edge / 220
-  const withVariance = base * tempo + (Math.random() * 0.9 - 0.45)
+  const withVariance = base * tempo + (random() * 0.9 - 0.45)
 
   return clamp(Math.round(withVariance), 0, 4)
 }
@@ -117,7 +118,7 @@ function estimateMinutesDistribution(team: Team, lineup: string[]): Map<string, 
     const inPlayer = incoming[idx]
     if (!inPlayer) return
 
-    const subMinute = 58 + Math.floor(Math.random() * 23)
+    const subMinute = 58 + Math.floor(random() * 23)
     minutesByPlayer.set(outPlayer.id, subMinute)
     minutesByPlayer.set(inPlayer.id, 90 - subMinute)
   })
@@ -248,7 +249,7 @@ function applyMatchDayRevenue(teams: Team[], results: MatchResult[]): { teams: T
       : 75
     const importanceEffect = (opponentStrength - 75) * 0.004
     // Random match-day variance ±3%
-    const variance = (Math.random() - 0.5) * 0.06
+    const variance = (random() - 0.5) * 0.06
 
     const fillRate = clamp(0.70 - priceEffect + moraleEffect + importanceEffect + variance, 0.20, 0.98)
     const revenue = Math.round(getOperationalCapacity(stadium) * fillRate * stadium.ticketPrice)
@@ -389,7 +390,7 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
         const fatigueInc =
           3
           + Math.round(5 * minuteShare)
-          + Math.floor(Math.random() * 5)
+          + Math.floor(random() * 5)
           + Math.max(0, Math.floor((100 - player.stamina) / 18))
           + Math.max(0, Math.floor((player.fatigue - 60) / 12))
         const fatigue = clamp(player.fatigue + fatigueInc, 0, 100)
@@ -403,8 +404,8 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
         const redChance = clamp((0.004 + fatigue / 5000) * (1 - (team.staff.disciplineLevel - 1) * 0.1), 0.002, 0.035)
         const participationFactor = 0.25 + minuteShare * 0.75
 
-        const gotYellow = isPlayerAvailable(player) && Math.random() < yellowChance * participationFactor
-        const gotRed = isPlayerAvailable(player) && Math.random() < redChance * participationFactor
+        const gotYellow = isPlayerAvailable(player) && random() < yellowChance * participationFactor
+        const gotRed = isPlayerAvailable(player) && random() < redChance * participationFactor
 
         let yellowCards = gotYellow ? player.yellowCards + 1 : player.yellowCards
         if (gotRed) {
@@ -431,7 +432,7 @@ function applyLineupEffects(teams: Team[], packs: MatchPack[]): { teams: Team[];
           incidents.suspensions.push(`${player.name} (${team.name}) quedo sancionado para la proxima jornada.`)
         }
 
-        const injuryWeeks = isPlayerAvailable(player) && Math.random() < injuryChance * participationFactor
+        const injuryWeeks = isPlayerAvailable(player) && random() < injuryChance * participationFactor
           ? getInjuryDuration(fatigue)
           : player.injuryWeeks
 

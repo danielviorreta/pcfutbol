@@ -1,3 +1,4 @@
+import { random } from './random'
 import {
   assessClubSaleDecision,
   assessTransferDecision,
@@ -370,7 +371,7 @@ function refreshAiTransferListings(
           player.contractYears >= 3
           && player.happiness >= 72
           && player.overall >= teamAverage
-          && Math.random() < 0.16
+          && random() < 0.16
 
         if (!shouldDelist) {
           return player
@@ -414,7 +415,7 @@ function refreshAiTransferListings(
         listingChance -= 0.12
       }
 
-      if (Math.random() >= clamp(listingChance, 0.03, 0.55)) {
+      if (random() >= clamp(listingChance, 0.03, 0.55)) {
         return player
       }
 
@@ -463,11 +464,11 @@ export function simulateAiTransferWindow(
   let workingState = listingUpdate.nextState
   const headlines: string[] = [...listingUpdate.headlines]
   const incomingOffers: IncomingTransferOffer[] = []
-  const maxTransfers = Math.random() > 0.72 ? 2 : 1
+  const maxTransfers = random() > 0.72 ? 2 : 1
   const existingOfferKeys = new Set(existingIncomingOffers.map((offer) => `${offer.buyerTeamId}:${offer.playerId}`))
 
   for (let transferIndex = 0; transferIndex < maxTransfers; transferIndex += 1) {
-    if (Math.random() > 0.42) {
+    if (random() > 0.42) {
       continue
     }
 
@@ -475,7 +476,7 @@ export function simulateAiTransferWindow(
       .filter((team) => team.id !== managerTeamId && team.players.length < 24 && team.budget > 8_000_000)
       .sort((a, b) => getClubAppeal(b) - getClubAppeal(a))
 
-    const buyer = buyers.find(() => Math.random() > 0.18)
+    const buyer = buyers.find(() => random() > 0.18)
     if (!buyer) {
       continue
     }
@@ -581,7 +582,7 @@ export function simulateAiContractRenewals(
         && player.overall >= teamAverage - 2
         && budget > player.wage * 2.2
         && (player.happiness >= 60 || player.overall >= teamAverage + 4)
-        && Math.random() > 0.38
+        && random() > 0.38
 
       if (!shouldRenew) {
         return player
