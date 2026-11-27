@@ -143,6 +143,7 @@ export function HistoryPage() {
                     ))}
                   </tbody>
                 </table>
+                {season.cupWinner && <p><strong>Copa del Rey:</strong> {season.cupWinner}</p>}
                 {season.promoted.length > 0 && <p><strong>Ascensos:</strong> {season.promoted.join(', ')}</p>}
                 {season.relegated.length > 0 && <p><strong>Descensos:</strong> {season.relegated.join(', ')}</p>}
               </section>

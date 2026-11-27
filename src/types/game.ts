@@ -87,6 +87,7 @@ export type FinanceCategory =
   | 'infrastructure'
   | 'staff'
   | 'board'
+  | 'cup'
 
 export interface FinanceEntry {
   id: string
@@ -185,6 +186,7 @@ export interface SeasonRecord {
   managerTeamName: string
   managerCompetition: string
   managerPosition: number
+  cupWinner?: string
 }
 
 export interface PendingRenewalOffer {
@@ -340,6 +342,8 @@ export interface LeagueState {
   promotionBracket: PromotionBracket | null
   /** Completed seasons, oldest first. */
   seasonHistory?: SeasonRecord[]
+  /** This season's Copa del Rey; missing on saves from before the cup existed. */
+  cup?: CupState
 }
 
 export interface ManagerGameState {
@@ -418,4 +422,29 @@ export interface BoardState {
   jobOffers: JobOffer[]
   /** Last verdict shown to the player (season review or dismissal). */
   lastReview?: string
+}
+
+export interface CupTie {
+  homeTeamId: string
+  awayTeamId: string
+  homeGoals?: number
+  awayGoals?: number
+  penalties?: { home: number; away: number }
+  /** Set once played. */
+  winnerId?: string
+}
+
+export interface CupRound {
+  name: string
+  /** Played midweek after this league matchday. */
+  afterLeagueRound: number
+  ties: CupTie[]
+}
+
+export interface CupState {
+  /** Rounds drawn so far; the last one is the current round. */
+  rounds: CupRound[]
+  /** Clubs that skip the first round. */
+  byeTeamIds: string[]
+  winnerId: string | null
 }

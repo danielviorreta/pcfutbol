@@ -3,6 +3,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ClubPage } from './pages/ClubPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { FinancePage } from './pages/FinancePage'
+import { CupPage } from './pages/CupPage'
 import { GamesPage } from './pages/GamesPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { MatchDayPage } from './pages/MatchDayPage'
@@ -79,6 +80,7 @@ function App() {
         {game && <NavLink to="/club">Club</NavLink>}
         {hasActivePromotions && <NavLink to="/promotions">Ascensos</NavLink>}
         {game && <NavLink to="/transfers">Mercado</NavLink>}
+        {game && <NavLink to="/cup">Copa</NavLink>}
         {game && <NavLink to="/history">Historial</NavLink>}
       </nav>
 
@@ -108,6 +110,7 @@ function App() {
         <Route path="/club" element={game ? <ClubPage /> : <Navigate to="/games" replace />} />
         <Route path="/club/player/:playerId" element={game ? <PlayerManagementPage /> : <Navigate to="/games" replace />} />
         <Route path="/promotions" element={game ? <PromotionPage /> : <Navigate to="/games" replace />} />
+        <Route path="/cup" element={game ? <CupPage /> : <Navigate to="/games" replace />} />
         <Route path="/history" element={game ? <HistoryPage /> : <Navigate to="/games" replace />} />
         <Route path="/transfers" element={game ? <TransfersPage /> : <Navigate to="/games" replace />} />
         <Route path="/transfers/offer/:playerId" element={game ? <TransferOfferPage /> : <Navigate to="/games" replace />} />

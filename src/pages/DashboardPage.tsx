@@ -4,6 +4,7 @@ import { BoardPanel } from '../components/BoardPanel'
 import { LeagueTable } from '../components/LeagueTable'
 import { NewsList } from '../components/NewsList'
 import { ResultsList } from '../components/ResultsList'
+import { findManagerCupTie } from '../engine/cup'
 import { sortLeagueTable } from '../engine/simulation'
 import { useGame } from '../state/gameState'
 
@@ -79,6 +80,7 @@ export function DashboardPage() {
   )
   const isSeasonOver = leagueState.currentRound > leagueState.totalRounds
   const isSacked = game.board?.status === 'sacked'
+  const managerCupTie = findManagerCupTie(leagueState.cup, managerTeam.id)
   const champion = isSeasonOver ? table[0] : null
   const managerFixture = leagueState.fixtures.find(
     (fixture) =>
@@ -165,6 +167,18 @@ export function DashboardPage() {
 
       <article className="panel">
         <h2>Agenda</h2>
+        {managerCupTie && (
+          <p className="cup-agenda">
+            Copa del Rey ({managerCupTie.round.name}): contra{' '}
+            <strong>
+              {teamName(
+                managerCupTie.tie.homeTeamId === managerTeam.id ? managerCupTie.tie.awayTeamId : managerCupTie.tie.homeTeamId,
+                leagueState.teams,
+              )}
+            </strong>{' '}
+            tras la jornada {managerCupTie.round.afterLeagueRound}
+          </p>
+        )}
         {isSeasonOver ? (
           <p>Calendario completado.</p>
         ) : (

@@ -30,6 +30,8 @@ function categoryLabel(category: FinanceCategory): string {
       return 'Personal'
     case 'board':
       return 'Directiva'
+    case 'cup':
+      return 'Copa'
     default:
       return category
   }

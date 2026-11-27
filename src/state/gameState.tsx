@@ -244,11 +244,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     updateActiveGame((prev) => {
       const result = processRound(prev, prev.managerLineup)
 
-      if (result.renewalMessages.length > 0) {
-        setNotice(result.renewalMessages.join(' | '))
-      } else {
-        setNotice('Jornada completada. Partida guardada automaticamente.')
-      }
+      const messages = [...result.renewalMessages, result.cupNotice].filter(Boolean)
+      setNotice(messages.length > 0 ? messages.join(' | ') : 'Jornada completada. Partida guardada automaticamente.')
 
       return applyRoundResult(prev, result)
     })
@@ -343,6 +340,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const noticeParts = [
       ...(result.renewalMessages.length > 0 ? result.renewalMessages : ['Jornada completada. Partida guardada automaticamente.']),
       ...(result.outgoingNotice ? [result.outgoingNotice] : []),
+      ...(result.cupNotice ? [result.cupNotice] : []),
     ]
     setNotice(noticeParts.join(' | '))
 

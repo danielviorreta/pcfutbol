@@ -3,7 +3,7 @@ import type { FinanceBreakdownItem, Fixture, LeagueState, MatchGoalEvent, MatchR
 import { getOperationalCapacity } from './stadium'
 import { getDefaultLineup, getTeamRatings, isPlayerAvailable, normalizeLineup } from './squad'
 
-interface PlayRoundOptions {
+export interface PlayRoundOptions {
   managerTeamId: string
   managerLineup: string[]
 }
@@ -647,4 +647,15 @@ export function sortLeagueTable(teams: Team[]): Team[] {
 
     return b.budget - a.budget
   })
+}
+
+/** Simulates one match outside the league calendar (e.g. a cup tie); no table or player effects. */
+export function simulateMatch(
+  home: Team,
+  away: Team,
+  options: PlayRoundOptions,
+): Pick<MatchResult, 'homeGoals' | 'awayGoals' | 'goals'> {
+  const fixture: Fixture = { id: `cup-${home.id}-${away.id}`, round: 0, homeTeamId: home.id, awayTeamId: away.id, played: false }
+  const { result } = getMatchPack(fixture, new Map([[home.id, home], [away.id, away]]), options)
+  return { homeGoals: result.homeGoals, awayGoals: result.awayGoals, goals: result.goals }
 }
