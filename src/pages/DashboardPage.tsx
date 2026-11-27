@@ -4,6 +4,7 @@ import { BoardPanel } from '../components/BoardPanel'
 import { LeagueTable } from '../components/LeagueTable'
 import { NewsList } from '../components/NewsList'
 import { ResultsList } from '../components/ResultsList'
+import { SEASON_MAX_ROUNDS } from '../engine/autoSimulation'
 import { findManagerCupTie } from '../engine/cup'
 import { sortLeagueTable } from '../engine/simulation'
 import { useGame } from '../state/gameState'
@@ -40,6 +41,7 @@ export function DashboardPage() {
     resetGame,
     saveCurrentGame,
     acceptJobOffer,
+    simulateAhead,
   } = useGame()
   const navigate = useNavigate()
 
@@ -147,6 +149,20 @@ export function DashboardPage() {
             disabled={isSeasonOver || isSacked}
           >
             Jugar Jornada
+          </button>
+          <button className="secondary" onClick={() => simulateAhead(5)} disabled={isSeasonOver || isSacked}>
+            Simular 5 jornadas
+          </button>
+          <button
+            className="secondary"
+            onClick={() => {
+              if (window.confirm('¿Simular hasta el final de la temporada? Se usara tu alineacion (o la automatica si hay bajas).')) {
+                simulateAhead(SEASON_MAX_ROUNDS)
+              }
+            }}
+            disabled={isSeasonOver || isSacked}
+          >
+            Simular hasta fin de temporada
           </button>
           <button className="secondary" onClick={saveCurrentGame}>
             Guardar Partida

@@ -52,6 +52,7 @@ Además del guardado automático en navegador, ya incluye copia de seguridad man
   - Estadisticas de temporada (partidos, goles, asistencias), tablas de goleadores y asistentes, e historial de temporadas (campeones, pichichis, ascensos/descensos y tu posicion).
 - Simulacion de partido y jornada:
   - Flujo de `MatchDay`: previa, simulacion y resultado final.
+  - Simulacion rapida: 5 jornadas seguidas o hasta el final de la temporada (con alineacion automatica si hay bajas).
   - Estadisticas del partido (posesion, tiros, ocasiones, asistencia).
   - Cronologia/comentarios, goleadores e incidencias.
   - Impacto de tactica y sustituciones en la simulacion.

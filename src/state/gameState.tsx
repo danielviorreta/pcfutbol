@@ -2,6 +2,7 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { buildGame, getCurrentManagerFixture, getManagerTeam, syncManagerLineup } from '../engine/gameUtils'
 import { applyRoundResult, processRound } from '../engine/roundProcessing'
+import { simulateRounds } from '../engine/autoSimulation'
 import * as actions from './gameActions'
 import type { ActionResult } from './gameActions'
 import {
@@ -59,6 +60,7 @@ interface GameContextValue {
   exportSaves: () => string
   importSaves: (raw: string) => boolean
   playRound: () => void
+  simulateAhead: (rounds: number) => void
   prepareMatchPresentation: () => boolean
   confirmMatchPresentation: () => void
   clearMatchPresentation: () => void
@@ -249,6 +251,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return applyRoundResult(prev, result)
     })
+  }
+
+  /** Plays up to `rounds` matchdays in one go (stops at season end or dismissal). */
+  const simulateAhead = (rounds: number) => {
+    if (!game) {
+      return
+    }
+    if (game.board?.status === 'sacked') {
+      setNotice('Has sido destituido. Elige una oferta de trabajo para continuar.')
+      return
+    }
+    const result = simulateRounds(game, rounds)
+    if (result.roundsPlayed > 0) {
+      updateActiveGame(() => result.game)
+    }
+    setMatchPresentation(null)
+    setNotice(result.summary)
   }
 
   const prepareMatchPresentation = (): boolean => {
@@ -495,6 +514,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     exportSaves,
     importSaves,
     playRound,
+    simulateAhead,
     prepareMatchPresentation,
     confirmMatchPresentation,
     clearMatchPresentation,
