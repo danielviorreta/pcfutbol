@@ -61,6 +61,7 @@ export function resetSeasonStats(team: Team): Team {
       suspensionWeeks: 0,
       yellowCards: 0,
       fatigue: clamp(player.fatigue - 12, 0, 100),
+      seasonStats: { appearances: 0, goals: 0, assists: 0 },
     })),
   }
 }

@@ -42,6 +42,14 @@ export interface Player {
   yellowCards: number
   contractYears: number
   recentMinutes?: number[]
+  /** Current-season league stats; missing on saves from before they were tracked. */
+  seasonStats?: PlayerSeasonStats
+}
+
+export interface PlayerSeasonStats {
+  appearances: number
+  goals: number
+  assists: number
 }
 
 export interface YouthPlayer {
@@ -78,6 +86,8 @@ export type FinanceCategory =
   | 'renewal'
   | 'infrastructure'
   | 'staff'
+  | 'board'
+  | 'cup'
 
 export interface FinanceEntry {
   id: string
@@ -144,6 +154,39 @@ export interface MatchResult {
   awayTeamId: string
   homeGoals: number
   awayGoals: number
+  /** Who scored and assisted each goal, in match order. */
+  goals?: MatchGoalEvent[]
+}
+
+export interface MatchGoalEvent {
+  teamId: string
+  scorerId: string
+  assistId?: string
+}
+
+export interface SeasonLeader {
+  playerName: string
+  teamName: string
+  value: number
+}
+
+export interface CompetitionSeasonRecord {
+  competition: string
+  champion: string
+  topScorer: SeasonLeader | null
+  topAssister: SeasonLeader | null
+}
+
+export interface SeasonRecord {
+  /** e.g. "2026/27"; filled in when the record is stored on the game. */
+  label: string
+  competitions: CompetitionSeasonRecord[]
+  promoted: string[]
+  relegated: string[]
+  managerTeamName: string
+  managerCompetition: string
+  managerPosition: number
+  cupWinner?: string
 }
 
 export interface PendingRenewalOffer {
@@ -297,6 +340,10 @@ export interface LeagueState {
   news: string[]
   promotionSummary: string[]
   promotionBracket: PromotionBracket | null
+  /** Completed seasons, oldest first. */
+  seasonHistory?: SeasonRecord[]
+  /** This season's Copa del Rey; missing on saves from before the cup existed. */
+  cup?: CupState
 }
 
 export interface ManagerGameState {
@@ -315,6 +362,8 @@ export interface ManagerGameState {
   pendingRenewalOffers: PendingRenewalOffer[]
   /** State of the seeded random generator; missing on saves created before it existed. */
   rngSeed?: number
+  /** Board expectations and patience; missing on saves from before it existed. */
+  board?: BoardState
   leagueState: LeagueState
 }
 
@@ -344,4 +393,58 @@ export interface TransferTarget {
   recommendedContractYears: number
   recommendedPromisedRole: PromisedRole
   interestLabel: string
+}
+
+export type BoardObjectiveKind = 'title' | 'europe' | 'top-half' | 'survival' | 'promotion' | 'playoff' | 'mid-table'
+
+export interface BoardObjective {
+  kind: BoardObjectiveKind
+  /** Worst league position that still meets the objective. */
+  targetPosition: number
+  description: string
+}
+
+export interface JobOffer {
+  teamId: string
+  teamName: string
+  competition: string
+  objective: BoardObjective
+}
+
+export interface BoardState {
+  objective: BoardObjective
+  /** 0-100; the manager is sacked if it falls too low. */
+  confidence: number
+  /** 0-100; grows with met objectives, decides which clubs offer jobs. */
+  reputation: number
+  status: 'employed' | 'sacked'
+  /** Offers to choose from after being sacked. */
+  jobOffers: JobOffer[]
+  /** Last verdict shown to the player (season review or dismissal). */
+  lastReview?: string
+}
+
+export interface CupTie {
+  homeTeamId: string
+  awayTeamId: string
+  homeGoals?: number
+  awayGoals?: number
+  penalties?: { home: number; away: number }
+  /** Set once played. */
+  winnerId?: string
+}
+
+export interface CupRound {
+  name: string
+  /** Played midweek after this league matchday. */
+  afterLeagueRound: number
+  ties: CupTie[]
+}
+
+export interface CupState {
+  /** Rounds drawn so far; the last one is the current round. */
+  rounds: CupRound[]
+  /** Clubs that skip the first round. */
+  byeTeamIds: string[]
+  winnerId: string | null
 }

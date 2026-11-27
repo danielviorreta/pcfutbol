@@ -20,6 +20,7 @@ import type {
 } from '../types/game'
 import { estimatePlayerHappiness, estimatePlayerValue, estimateReleaseClause } from '../engine/playerMarket'
 import { buildSeasonFixtures } from '../engine/fixtures'
+import { createCup } from '../engine/cup'
 import seasonData from './season-2026-27.json'
 
 export interface SeasonPlayer {
@@ -313,6 +314,7 @@ export function createInitialLeagueState(): LeagueState {
     news: ['Temporada iniciada: la prensa espera una liga muy igualada.'],
     promotionSummary: [],
     promotionBracket: null,
+    cup: createCup(teams),
   }
 }
 

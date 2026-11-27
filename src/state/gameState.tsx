@@ -2,6 +2,7 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { buildGame, getCurrentManagerFixture, getManagerTeam, syncManagerLineup } from '../engine/gameUtils'
 import { applyRoundResult, processRound } from '../engine/roundProcessing'
+import { simulateRounds } from '../engine/autoSimulation'
 import * as actions from './gameActions'
 import type { ActionResult } from './gameActions'
 import {
@@ -59,6 +60,7 @@ interface GameContextValue {
   exportSaves: () => string
   importSaves: (raw: string) => boolean
   playRound: () => void
+  simulateAhead: (rounds: number) => void
   prepareMatchPresentation: () => boolean
   confirmMatchPresentation: () => void
   clearMatchPresentation: () => void
@@ -83,6 +85,7 @@ interface GameContextValue {
   upgradeStadium: () => void
   improveMedicalStaff: () => void
   improveDisciplineStaff: () => void
+  acceptJobOffer: (teamId: string) => void
   clearNotice: () => void
 }
 
@@ -236,21 +239,44 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const setSaveName = run(actions.setSaveName)
 
   const playRound = () => {
+    if (game?.board?.status === 'sacked') {
+      setNotice('Has sido destituido. Elige una oferta de trabajo para continuar.')
+      return
+    }
     updateActiveGame((prev) => {
       const result = processRound(prev, prev.managerLineup)
 
-      if (result.renewalMessages.length > 0) {
-        setNotice(result.renewalMessages.join(' | '))
-      } else {
-        setNotice('Jornada completada. Partida guardada automaticamente.')
-      }
+      const messages = [...result.renewalMessages, result.cupNotice].filter(Boolean)
+      setNotice(messages.length > 0 ? messages.join(' | ') : 'Jornada completada. Partida guardada automaticamente.')
 
       return applyRoundResult(prev, result)
     })
   }
 
+  /** Plays up to `rounds` matchdays in one go (stops at season end or dismissal). */
+  const simulateAhead = (rounds: number) => {
+    if (!game) {
+      return
+    }
+    if (game.board?.status === 'sacked') {
+      setNotice('Has sido destituido. Elige una oferta de trabajo para continuar.')
+      return
+    }
+    const result = simulateRounds(game, rounds)
+    if (result.roundsPlayed > 0) {
+      updateActiveGame(() => result.game)
+    }
+    setMatchPresentation(null)
+    setNotice(result.summary)
+  }
+
   const prepareMatchPresentation = (): boolean => {
     if (!game) {
+      return false
+    }
+
+    if (game.board?.status === 'sacked') {
+      setNotice('Has sido destituido. Elige una oferta de trabajo para continuar.')
       return false
     }
 
@@ -333,6 +359,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const noticeParts = [
       ...(result.renewalMessages.length > 0 ? result.renewalMessages : ['Jornada completada. Partida guardada automaticamente.']),
       ...(result.outgoingNotice ? [result.outgoingNotice] : []),
+      ...(result.cupNotice ? [result.cupNotice] : []),
     ]
     setNotice(noticeParts.join(' | '))
 
@@ -351,8 +378,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       : undefined
     const goals = matchResult
       ? [
-        ...buildGoalRecords(homeTeamBeforeMatch, matchPresentation.homeLineup, matchResult.homeGoals, homeTeamBeforeMatch.id),
-        ...buildGoalRecords(awayTeamBeforeMatch, matchPresentation.awayLineup, matchResult.awayGoals, awayTeamBeforeMatch.id, 4),
+        ...buildGoalRecords(homeTeamBeforeMatch, matchPresentation.homeLineup, matchResult.homeGoals, homeTeamBeforeMatch.id, 0, matchResult.goals),
+        ...buildGoalRecords(awayTeamBeforeMatch, matchPresentation.awayLineup, matchResult.awayGoals, awayTeamBeforeMatch.id, 4, matchResult.goals),
       ].sort((a, b) => a.minute - b.minute)
       : undefined
     const incidents = matchResult && homeTeamAfterMatch && awayTeamAfterMatch
@@ -462,6 +489,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const improveMedicalStaff = run(actions.improveMedicalStaff)
 
   const improveDisciplineStaff = run(actions.improveDisciplineStaff)
+  const acceptJobOffer = run(actions.acceptJobOffer)
 
   const clearNotice = () => setNotice(null)
   const clearMatchPresentation = () => setMatchPresentation(null)
@@ -486,6 +514,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     exportSaves,
     importSaves,
     playRound,
+    simulateAhead,
     prepareMatchPresentation,
     confirmMatchPresentation,
     clearMatchPresentation,
@@ -510,6 +539,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     upgradeStadium,
     improveMedicalStaff,
     improveDisciplineStaff,
+    acceptJobOffer,
     clearNotice,
   }
 

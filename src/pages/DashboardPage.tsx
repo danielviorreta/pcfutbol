@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BoardPanel } from '../components/BoardPanel'
 import { LeagueTable } from '../components/LeagueTable'
 import { NewsList } from '../components/NewsList'
 import { ResultsList } from '../components/ResultsList'
+import { SEASON_MAX_ROUNDS } from '../engine/autoSimulation'
+import { findManagerCupTie } from '../engine/cup'
 import { sortLeagueTable } from '../engine/simulation'
 import { useGame } from '../state/gameState'
 
@@ -37,6 +40,8 @@ export function DashboardPage() {
     prepareMatchPresentation,
     resetGame,
     saveCurrentGame,
+    acceptJobOffer,
+    simulateAhead,
   } = useGame()
   const navigate = useNavigate()
 
@@ -76,6 +81,8 @@ export function DashboardPage() {
     managerTeam.players.reduce((sum, player) => sum + player.wage, 0) / 52,
   )
   const isSeasonOver = leagueState.currentRound > leagueState.totalRounds
+  const isSacked = game.board?.status === 'sacked'
+  const managerCupTie = findManagerCupTie(leagueState.cup, managerTeam.id)
   const champion = isSeasonOver ? table[0] : null
   const managerFixture = leagueState.fixtures.find(
     (fixture) =>
@@ -139,9 +146,23 @@ export function DashboardPage() {
                 navigate('/matchday')
               }
             }}
-            disabled={isSeasonOver}
+            disabled={isSeasonOver || isSacked}
           >
             Jugar Jornada
+          </button>
+          <button className="secondary" onClick={() => simulateAhead(5)} disabled={isSeasonOver || isSacked}>
+            Simular 5 jornadas
+          </button>
+          <button
+            className="secondary"
+            onClick={() => {
+              if (window.confirm('¿Simular hasta el final de la temporada? Se usara tu alineacion (o la automatica si hay bajas).')) {
+                simulateAhead(SEASON_MAX_ROUNDS)
+              }
+            }}
+            disabled={isSeasonOver || isSacked}
+          >
+            Simular hasta fin de temporada
           </button>
           <button className="secondary" onClick={saveCurrentGame}>
             Guardar Partida
@@ -158,8 +179,22 @@ export function DashboardPage() {
         )}
       </article>
 
+      <BoardPanel game={game} managerTeam={managerTeam} onAcceptOffer={acceptJobOffer} />
+
       <article className="panel">
         <h2>Agenda</h2>
+        {managerCupTie && (
+          <p className="cup-agenda">
+            Copa del Rey ({managerCupTie.round.name}): contra{' '}
+            <strong>
+              {teamName(
+                managerCupTie.tie.homeTeamId === managerTeam.id ? managerCupTie.tie.awayTeamId : managerCupTie.tie.homeTeamId,
+                leagueState.teams,
+              )}
+            </strong>{' '}
+            tras la jornada {managerCupTie.round.afterLeagueRound}
+          </p>
+        )}
         {isSeasonOver ? (
           <p>Calendario completado.</p>
         ) : (

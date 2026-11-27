@@ -1,5 +1,6 @@
 import { createSeed } from './random'
 import { loadSeason } from './seasonLoader'
+import { createBoardState } from './board'
 import { getDefaultLineup, sanitizeLineupSelection } from './squad'
 import type { Fixture, IncomingTransferOffer, ManagerGameState, Team } from '../types/game'
 
@@ -31,6 +32,7 @@ export async function buildGame(input: CreateGameInput): Promise<ManagerGameStat
     updatedAt: now,
     seasonStartYear: SEASON_START_YEAR,
     rngSeed: createSeed(),
+    board: createBoardState(leagueState.teams, managerTeam),
     managerName: input.managerName.trim() || 'Mister',
     managerTeamId: managerTeam.id,
     managerLineup: getDefaultLineup(managerTeam),

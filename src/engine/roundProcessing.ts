@@ -12,6 +12,9 @@ import {
   syncManagerLineup,
   syncManagerSquadOrder,
 } from './gameUtils'
+import { applyBoardAfterRound } from './board'
+import { CUP_SCHEDULE, createCup, playCupRound } from './cup'
+import type { CupRoundOutcome } from './cup'
 import { createSeed, withSeed } from './random'
 import { playCurrentRound } from './simulation'
 import { buyPlayer } from './transfers'
@@ -30,6 +33,8 @@ export interface RoundProcessingResult {
   renewalMessages: string[]
   outgoingFinanceEntries: ReturnType<typeof createFinanceEntry>[]
   outgoingNotice: string
+  /** Result of the manager's cup tie this round, if any. */
+  cupNotice: string
   financeEntries: ReturnType<typeof appendFinanceEntries>
   resolvedRenewalOffers: PendingRenewalOffer[]
   resolvedOutgoingIds: Set<string>
@@ -53,12 +58,16 @@ export function processRound(
 
 /** Builds the next game state from a processed round (shared by quick play and the match-day screen). */
 export function applyRoundResult(game: ManagerGameState, result: RoundProcessingResult): ManagerGameState {
+  return applyBoardAfterRound(game, applyRoundState(game, result), result.seasonRolledOver)
+}
+
+function applyRoundState(game: ManagerGameState, result: RoundProcessingResult): ManagerGameState {
   return {
     ...game,
     rngSeed: result.nextRngSeed,
     seasonStartYear: result.seasonRolledOver ? game.seasonStartYear + 1 : game.seasonStartYear,
     financeEntries: result.financeEntries,
-    leagueState: result.stateAfterOutgoing,
+    leagueState: result.seasonRolledOver ? labelLatestSeason(result.stateAfterOutgoing, game.seasonStartYear) : result.stateAfterOutgoing,
     pendingTransferOffers: result.pendingTransferOffers,
     pendingRenewalOffers: (game.pendingRenewalOffers ?? []).filter(
       (offer) => !result.resolvedRenewalOffers.some((resolved) => resolved.id === offer.id),
@@ -71,14 +80,56 @@ export function applyRoundResult(game: ManagerGameState, result: RoundProcessing
   }
 }
 
+/** Stamps the season just finished (e.g. "2026/27") on the newest history record. */
+function labelLatestSeason(state: LeagueState, seasonStartYear: number): LeagueState {
+  const history = state.seasonHistory ?? []
+  const latest = history[history.length - 1]
+  if (!latest || latest.label) {
+    return state
+  }
+  const label = `${seasonStartYear}/${String((seasonStartYear + 1) % 100).padStart(2, '0')}`
+  return { ...state, seasonHistory: [...history.slice(0, -1), { ...latest, label }] }
+}
+
+/** Saves from before the cup existed get one if the first cup round hasn't passed yet. */
+function withCup(state: LeagueState): LeagueState {
+  if (state.cup || state.currentRound > CUP_SCHEDULE[0].afterLeagueRound) {
+    return state
+  }
+  return { ...state, cup: createCup(state.teams) }
+}
+
+function describeManagerCupTie(outcome: CupRoundOutcome, state: LeagueState, managerTeamId: string): string {
+  if (!outcome.managerTie) {
+    return ''
+  }
+  const { tie, roundName } = outcome.managerTie
+  const name = (id: string) => state.teams.find((team) => team.id === id)?.name ?? id
+  const penalties = tie.penalties ? ` (${tie.penalties.home}-${tie.penalties.away} pen.)` : ''
+  const score = `${name(tie.homeTeamId)} ${tie.homeGoals}-${tie.awayGoals} ${name(tie.awayTeamId)}${penalties}`
+  if (tie.winnerId !== managerTeamId) {
+    return `Copa del Rey (${roundName}): eliminados. ${score}.`
+  }
+  return roundName === CUP_SCHEDULE[CUP_SCHEDULE.length - 1].name
+    ? `¡Campeones de la Copa del Rey! ${score}.`
+    : `Copa del Rey (${roundName}): pasamos de ronda. ${score}.`
+}
+
 function runRound(
   game: ManagerGameState,
   managerLineup: string[],
 ): Omit<RoundProcessingResult, 'nextRngSeed'> {
-  const simulatedState = playCurrentRound(game.leagueState, {
+  const playedRound = game.leagueState.currentRound
+  const leagueAfterRound = playCurrentRound(withCup(game.leagueState), {
     managerTeamId: game.managerTeamId,
     managerLineup,
   })
+  const cupOutcome = playCupRound(leagueAfterRound, playedRound, game.managerTeamId, managerLineup)
+  const simulatedState = {
+    ...cupOutcome.state,
+    news: [...cupOutcome.headlines, ...cupOutcome.state.news].slice(0, 12),
+  }
+  const cupNotice = describeManagerCupTie(cupOutcome, simulatedState, game.managerTeamId)
   const seasonRolledOver = simulatedState.currentRound > simulatedState.totalRounds
 
   const { nextState, headlines, incomingOffers, financeBreakdown } =
@@ -162,7 +213,7 @@ function runRound(
   const financeEntries = appendFinanceEntries(game, [
     ...mapBreakdownToEntries(
       game.leagueState.currentRound,
-      simulatedState.financeBreakdown,
+      leagueAfterRound.financeBreakdown,
       game.managerTeamId,
     ),
     ...mapBreakdownToEntries(
@@ -180,6 +231,7 @@ function runRound(
       ),
     ),
     ...outgoingFinanceEntries,
+    ...mapBreakdownToEntries(playedRound, cupOutcome.finance, game.managerTeamId),
   ])
 
   return {
@@ -189,6 +241,7 @@ function runRound(
     renewalMessages,
     outgoingFinanceEntries,
     outgoingNotice,
+    cupNotice,
     financeEntries,
     resolvedRenewalOffers,
     resolvedOutgoingIds,

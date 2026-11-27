@@ -48,8 +48,11 @@ Además del guardado automático en navegador, ya incluye copia de seguridad man
   - Ligas por divisiones y grupos (Primera, Segunda y Primera Federacion).
   - Clasificacion, calendario y avance por jornadas.
   - Sistema de ascensos/descensos y vista de promociones.
+  - Copa del Rey: eliminatoria a partido unico con los 82 clubes, siete rondas repartidas por la temporada, penaltis, premios por ronda y campeon en el historial.
+  - Estadisticas de temporada (partidos, goles, asistencias), tablas de goleadores y asistentes, e historial de temporadas (campeones, pichichis, ascensos/descensos y tu posicion).
 - Simulacion de partido y jornada:
   - Flujo de `MatchDay`: previa, simulacion y resultado final.
+  - Simulacion rapida: 5 jornadas seguidas o hasta el final de la temporada (con alineacion automatica si hay bajas).
   - Estadisticas del partido (posesion, tiros, ocasiones, asistencia).
   - Cronologia/comentarios, goleadores e incidencias.
   - Impacto de tactica y sustituciones en la simulacion.
@@ -61,9 +64,11 @@ Además del guardado automático en navegador, ya incluye copia de seguridad man
   - Indicadores de ajuste posicional (verde/naranja/rojo) y leyendas de roles.
   - Estados de jugador: disponible, lesionado o sancionado.
   - Renovaciones de contrato, rol prometido y promocion de cantera.
+  - Fin de temporada: los jugadores cumplen años, progresan o declinan con la edad, los contratos vencen (agentes libres), los veteranos se retiran y las plantillas se completan con la cantera.
 - Club y mercado:
   - Economia de club con libro financiero por categorias (sponsor, taquilla, salarios, fichajes, staff, infraestructura).
   - Ajustes de club: tactica, foco de entrenamiento y precio de entradas.
+  - Directiva: objetivo de temporada segun la plantilla, confianza que cambia con los resultados, prima por objetivo cumplido, destitucion y ofertas de otros clubes segun tu reputacion.
   - Mejoras de estadio y staff (medico y disciplina).
   - Mercado de fichajes con listado de transferibles, compra/venta y ofertas entrantes/salientes.
   - Persistencia completa del estado de carrera.
