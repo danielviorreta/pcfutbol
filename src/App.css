@@ -2552,3 +2552,57 @@ input[type='checkbox'] {
 .history-season table {
   margin-bottom: 0.5rem;
 }
+
+.board-meter {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.board-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.board-meter-good { background: #22c55e; }
+.board-meter-warn { background: #f59e0b; }
+.board-meter-bad { background: #ef4444; }
+
+.board-on-target { color: #4ade80; }
+.board-off-target { color: #fbbf24; }
+
+.board-review {
+  font-size: 0.9rem;
+  opacity: 0.85;
+  border-left: 3px solid var(--line-strong);
+  padding-left: 0.6rem;
+}
+
+.board-sacked {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.job-offers {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.job-offers li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+}
+
+.job-offers p {
+  margin: 0.25rem 0 0;
+}

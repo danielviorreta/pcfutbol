@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BoardPanel } from '../components/BoardPanel'
 import { LeagueTable } from '../components/LeagueTable'
 import { NewsList } from '../components/NewsList'
 import { ResultsList } from '../components/ResultsList'
@@ -37,6 +38,7 @@ export function DashboardPage() {
     prepareMatchPresentation,
     resetGame,
     saveCurrentGame,
+    acceptJobOffer,
   } = useGame()
   const navigate = useNavigate()
 
@@ -76,6 +78,7 @@ export function DashboardPage() {
     managerTeam.players.reduce((sum, player) => sum + player.wage, 0) / 52,
   )
   const isSeasonOver = leagueState.currentRound > leagueState.totalRounds
+  const isSacked = game.board?.status === 'sacked'
   const champion = isSeasonOver ? table[0] : null
   const managerFixture = leagueState.fixtures.find(
     (fixture) =>
@@ -139,7 +142,7 @@ export function DashboardPage() {
                 navigate('/matchday')
               }
             }}
-            disabled={isSeasonOver}
+            disabled={isSeasonOver || isSacked}
           >
             Jugar Jornada
           </button>
@@ -157,6 +160,8 @@ export function DashboardPage() {
           </p>
         )}
       </article>
+
+      <BoardPanel game={game} managerTeam={managerTeam} onAcceptOffer={acceptJobOffer} />
 
       <article className="panel">
         <h2>Agenda</h2>

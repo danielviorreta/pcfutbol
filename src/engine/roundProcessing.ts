@@ -12,6 +12,7 @@ import {
   syncManagerLineup,
   syncManagerSquadOrder,
 } from './gameUtils'
+import { applyBoardAfterRound } from './board'
 import { createSeed, withSeed } from './random'
 import { playCurrentRound } from './simulation'
 import { buyPlayer } from './transfers'
@@ -53,6 +54,10 @@ export function processRound(
 
 /** Builds the next game state from a processed round (shared by quick play and the match-day screen). */
 export function applyRoundResult(game: ManagerGameState, result: RoundProcessingResult): ManagerGameState {
+  return applyBoardAfterRound(game, applyRoundState(game, result), result.seasonRolledOver)
+}
+
+function applyRoundState(game: ManagerGameState, result: RoundProcessingResult): ManagerGameState {
   return {
     ...game,
     rngSeed: result.nextRngSeed,

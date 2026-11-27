@@ -83,6 +83,7 @@ interface GameContextValue {
   upgradeStadium: () => void
   improveMedicalStaff: () => void
   improveDisciplineStaff: () => void
+  acceptJobOffer: (teamId: string) => void
   clearNotice: () => void
 }
 
@@ -236,6 +237,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const setSaveName = run(actions.setSaveName)
 
   const playRound = () => {
+    if (game?.board?.status === 'sacked') {
+      setNotice('Has sido destituido. Elige una oferta de trabajo para continuar.')
+      return
+    }
     updateActiveGame((prev) => {
       const result = processRound(prev, prev.managerLineup)
 
@@ -251,6 +256,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const prepareMatchPresentation = (): boolean => {
     if (!game) {
+      return false
+    }
+
+    if (game.board?.status === 'sacked') {
+      setNotice('Has sido destituido. Elige una oferta de trabajo para continuar.')
       return false
     }
 
@@ -462,6 +472,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const improveMedicalStaff = run(actions.improveMedicalStaff)
 
   const improveDisciplineStaff = run(actions.improveDisciplineStaff)
+  const acceptJobOffer = run(actions.acceptJobOffer)
 
   const clearNotice = () => setNotice(null)
   const clearMatchPresentation = () => setMatchPresentation(null)
@@ -510,6 +521,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     upgradeStadium,
     improveMedicalStaff,
     improveDisciplineStaff,
+    acceptJobOffer,
     clearNotice,
   }
 

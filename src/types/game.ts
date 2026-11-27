@@ -86,6 +86,7 @@ export type FinanceCategory =
   | 'renewal'
   | 'infrastructure'
   | 'staff'
+  | 'board'
 
 export interface FinanceEntry {
   id: string
@@ -357,6 +358,8 @@ export interface ManagerGameState {
   pendingRenewalOffers: PendingRenewalOffer[]
   /** State of the seeded random generator; missing on saves created before it existed. */
   rngSeed?: number
+  /** Board expectations and patience; missing on saves from before it existed. */
+  board?: BoardState
   leagueState: LeagueState
 }
 
@@ -386,4 +389,33 @@ export interface TransferTarget {
   recommendedContractYears: number
   recommendedPromisedRole: PromisedRole
   interestLabel: string
+}
+
+export type BoardObjectiveKind = 'title' | 'europe' | 'top-half' | 'survival' | 'promotion' | 'playoff' | 'mid-table'
+
+export interface BoardObjective {
+  kind: BoardObjectiveKind
+  /** Worst league position that still meets the objective. */
+  targetPosition: number
+  description: string
+}
+
+export interface JobOffer {
+  teamId: string
+  teamName: string
+  competition: string
+  objective: BoardObjective
+}
+
+export interface BoardState {
+  objective: BoardObjective
+  /** 0-100; the manager is sacked if it falls too low. */
+  confidence: number
+  /** 0-100; grows with met objectives, decides which clubs offer jobs. */
+  reputation: number
+  status: 'employed' | 'sacked'
+  /** Offers to choose from after being sacked. */
+  jobOffers: JobOffer[]
+  /** Last verdict shown to the player (season review or dismissal). */
+  lastReview?: string
 }

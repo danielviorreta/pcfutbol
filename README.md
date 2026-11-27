@@ -66,6 +66,7 @@ Además del guardado automático en navegador, ya incluye copia de seguridad man
 - Club y mercado:
   - Economia de club con libro financiero por categorias (sponsor, taquilla, salarios, fichajes, staff, infraestructura).
   - Ajustes de club: tactica, foco de entrenamiento y precio de entradas.
+  - Directiva: objetivo de temporada segun la plantilla, confianza que cambia con los resultados, prima por objetivo cumplido, destitucion y ofertas de otros clubes segun tu reputacion.
   - Mejoras de estadio y staff (medico y disciplina).
   - Mercado de fichajes con listado de transferibles, compra/venta y ofertas entrantes/salientes.
   - Persistencia completa del estado de carrera.

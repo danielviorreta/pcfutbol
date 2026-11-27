@@ -28,6 +28,8 @@ function categoryLabel(category: FinanceCategory): string {
       return 'Infraestructura'
     case 'staff':
       return 'Personal'
+    case 'board':
+      return 'Directiva'
     default:
       return category
   }

@@ -14,6 +14,7 @@ import {
   submitRenewalOffer,
   upgradeStadium as upgradeStadiumEngine,
 } from '../engine/club'
+import { takeJob } from '../engine/board'
 import { appendFinanceEntries, createFinanceEntry, getTeamBudget } from '../engine/finance'
 import { getManagerTeam, syncManagerLineup, syncManagerSquadOrder } from '../engine/gameUtils'
 import { validatePlayerPurchase } from '../engine/purchaseValidation'
@@ -419,4 +420,12 @@ export function improveDisciplineStaff(prev: ManagerGameState): ActionResult {
       ]),
     }
   })
+}
+
+export function acceptJobOffer(prev: ManagerGameState, teamId: string): ActionResult {
+  const offer = prev.board?.jobOffers.find((item) => item.teamId === teamId)
+  if (!offer) {
+    return { game: prev, notice: 'Esa oferta ya no esta disponible.' }
+  }
+  return { game: takeJob(prev, offer), notice: `Bienvenido al ${offer.teamName}. Objetivo: ${offer.objective.description}.` }
 }
